@@ -9,9 +9,16 @@ Static pages served at https://artifacts.tahmid.dev via a Cloudflare Worker with
 
 ## Adding an artifact
 
-1. Drop the standalone HTML at `public/<slug>/index.html`
-2. Add a card for it in `public/index.html`
-3. Push to `main`; the GitHub Action deploys with wrangler
+Use the `publish-artifact` Claude skill, or by hand:
+
+```
+python3 ~/.claude/skills/publish-artifact/scripts/add_artifact.py page.html \
+  --slug my-page --title "My Page" --summary "One sentence for the index card."
+```
+
+The script copies the page to `public/<slug>/index.html`, registers it in `artifacts.json`,
+regenerates `public/index.html` (never edit it by hand), commits and pushes. The GitHub Action
+deploys with wrangler on every push to `main`.
 
 ## Manual deploy
 
