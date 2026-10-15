@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Artifacts</title>
+<style>
+  :root { --bg: #f4f5f7; --surface: #fff; --line: #d9dde3; --fg: #161a1f; --muted: #5f6873; --accent: #1f5fbf; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #121417; --surface: #1b1e23; --line: #2e333b; --fg: #e8eaed; --muted: #9aa0a6; --accent: #8ab4f8; }
+  }
+  :root[data-theme="dark"] { --bg: #121417; --surface: #1b1e23; --line: #2e333b; --fg: #e8eaed; --muted: #9aa0a6; --accent: #8ab4f8; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 56px 16px; }
+  .eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -.01em; }
+  p.lead { color: var(--muted); margin: 0 0 28px; }
+  .list { display: grid; gap: 10px; }
+  a.card { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; text-decoration: none; color: inherit; }
+  a.card:hover { border-color: var(--accent); }
+  a.card strong { display: block; font-size: 18px; }
+  a.card span { color: var(--muted); font-size: 13.5px; }
+  a.card time { display: block; color: var(--muted); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">tahmid.dev</div>
+  <h1>Artifacts</h1>
+  <p class="lead">Design notes, write-ups and pages worth sharing.</p>
+  <div class="list">
+    <a class="card" href="/task-email-links/">
+      <strong>Task ↔ Email Links</strong>
+      <span>Design proposal for relating tasks to email threads across taskservice and notificationservice.</span>
+      <time datetime="2026-10-15">2026-10-15</time>
+    </a>
+  </div>
+</main>
+</body>
+</html>

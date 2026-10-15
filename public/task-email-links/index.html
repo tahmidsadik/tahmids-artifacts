@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Email Links</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e5e8;
+    --panel: #f6f7f9; --accent: #1f5fbf; --accent-bg: #e8f0fe; --warn-bg: #fff4e5; --warn: #8a5300;
+    --code-bg: #f1f3f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
+      --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
+      --code-bg: #22262c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
+    --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
+    --code-bg: #22262c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 32px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  p, li { max-width: 72ch; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .callout { background: var(--accent-bg); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .decision { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .decision strong { color: var(--warn); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 14px; color: var(--muted); }
+  .mock { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 12px 0 20px; font-size: 14px; }
+  .mock .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .mock .head b { font-size: 15px; }
+  .mock .btn { border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 3px 10px; font-size: 13px; }
+  .mock .row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .mock .row.th { color: var(--muted); font-size: 12.5px; border-top: none; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--accent-bg); color: var(--accent); }
+  svg text { font-family: inherit; }
+  @media (max-width: 600px) { .mock .row { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Task ↔ Email Links</h1>
+  <p class="sub">Design proposal · taskservice, notificationservicev2, task frontend, email frontend · 2026-10-15</p>
+
+  <div class="callout">
+    <strong>Recommendation in one line.</strong> Link tasks to email <em>threads</em>, store the link in <strong>taskservice</strong> as a generic
+    <code>task_links</code> row, and let both the email detail view and the task view read from taskservice. Notificationservicev2 only gains two
+    aggregate fields on the thread.
+  </div>
+
+  <h2>1. Where things stand</h2>
+  <div class="cards">
+    <div class="card"><h4>Tasks</h4><p>One single-valued entity link (<code>entityType</code>, <code>entityCode</code>, <code>entityNumber</code>) on the task row, validated at write time by calling the owning service. List is filterable by entity type and code.</p></div>
+    <div class="card"><h4>Email threads</h4><p>A thread groups an outbound email with its replies and bounces. It also carries one entity link. The thread detail page in the email frontend is the "email details view".</p></div>
+    <div class="card"><h4>Between them</h4><p>Nothing. Taskservice has no gRPC client for notificationservice, and notificationservice has none for taskservice.</p></div>
+  </div>
+
+  <h2>2. Decisions</h2>
+
+  <div class="decision"><strong>Granularity: thread, not message.</strong>
+    A task relates to a conversation, not to one reply. Message-level links multiply rows without adding meaning, and a message always resolves to its thread.
+    A nullable <code>message_code</code> can be added later if a specific message ever needs pinning.</div>
+
+  <div class="decision"><strong>Owner: taskservice.</strong>
+    The link is an attribute of the task, exactly like the entity link. One write path, one permission model, and the task list can be filtered by thread code with a plain join.
+    Storing it in notificationservicev2 would force that service to validate task codes and would split "what is this task about" across two databases.</div>
+
+  <div class="decision"><strong>Shape: generic link table, scoped to <code>EmailThread</code> for now.</strong>
+    Mirrors the existing <code>EntityRef {type, code}</code>. Documents or comments can be linked later without a new table or new endpoints.
+    The alternative, a dedicated <code>task_email_threads</code> table, costs the same today and one more table next time.</div>
+
+  <h2>3. Data model (taskservice)</h2>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>id</code></td><td>serial</td><td></td></tr>
+    <tr><td><code>task_id</code></td><td>int</td><td>FK → tasks.id, <code>ON DELETE CASCADE</code></td></tr>
+    <tr><td><code>link_type</code></td><td>varchar</td><td>enum, only <code>EmailThread</code> initially</td></tr>
+    <tr><td><code>link_code</code></td><td>varchar</td><td>the thread code, e.g. <code>thr_a1b2c3d4e5</code></td></tr>
+    <tr><td><code>owner</code>, <code>tenant_hierarchy</code></td><td>varchar</td><td>same defaults as tasks (RLS)</td></tr>
+    <tr><td><code>created_by</code>, <code>created_at</code></td><td></td><td>who linked it and when</td></tr>
+    <tr><td colspan="3">Unique <code>(task_id, link_type, link_code)</code> · Index <code>(link_type, link_code)</code> for the "tasks for this thread" lookup</td></tr>
+  </table>
+  <p>Taskservice stores <strong>only the code</strong>. Subject, status and activity of the thread are fetched live, so nothing goes stale.</p>
+
+  <h2>4. API changes</h2>
+
+  <h3>Protorepo · taskservice/v1</h3>
+<pre><code>message TaskLink {
+  string type = 1;   // "EmailThread"
+  string code = 2;
+}
+
+message Task {
+  ...
+  repeated TaskLink links = 22;   // always returned, like category_slugs
+}
+
+message CreateTaskRequest {
+  ...
+  repeated TaskLink links = 12;   // "create task from this email" in one call
+}
+
+message AddTaskLinkRequest    { string code = 1; TaskLink link = 2; }
+message AddTaskLinkResponse   { Task task = 1; }
+message RemoveTaskLinkRequest { string code = 1; string link_type = 2; string link_code = 3; }
+message RemoveTaskLinkResponse{ Task task = 1; }
+
+service TaskService {
+  ...
+  rpc AddTaskLink(AddTaskLinkRequest) returns (AddTaskLinkResponse) {}
+  rpc RemoveTaskLink(RemoveTaskLinkRequest) returns (RemoveTaskLinkResponse) {}
+}</code></pre>
+
+  <h3>Protorepo · notificationservice/v1</h3>
+<pre><code>message EmailThread {
+  ...
+  uint32 message_count = 10;
+  optional google.protobuf.Timestamp last_message_at = 11;
+}</code></pre>
+  <p>Cheap aggregates on the thread query. They let the task view show activity without loading messages and are useful on the thread list as well.</p>
+
+  <h3>REST · taskservice</h3>
+  <table>
+    <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+    <tr><td><code>POST</code></td><td><code>/tasks/:code/links</code></td><td>Body <code>{type, code}</code>. Validates the thread exists via notificationservice gRPC <code>GetEmailThread</code>. Returns the task.</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/tasks/:code/links/:type/:linkCode</code></td><td>Unlink. Returns the task.</td></tr>
+    <tr><td><code>GET</code></td><td><code>/tasks?filters=links.code==thr_x</code></td><td>Tasks for a thread. New filterable columns <code>links.type</code>, <code>links.code</code> in the paginate config.</td></tr>
+    <tr><td><code>POST</code></td><td><code>/tasks</code></td><td>Accepts <code>links[]</code> on create.</td></tr>
+  </table>
+
+  <h3>REST · notificationservicev2</h3>
+  <p>No new endpoints. The email frontend calls taskservice directly, as the entity task widget already does for claims and policies. Avoids a notificationservice → taskservice dependency.</p>
+
+  <h3>Validation and audit</h3>
+  <ul>
+    <li>Taskservice gets a notificationservice gRPC client config and a resolver for <code>EmailThread</code>, following the existing <code>LinkedEntityResolverService</code> pattern. Unknown thread → 404.</li>
+    <li>Linking requires the task update permission. Viewing linked threads requires the email view permission, which the user already needs to open the thread page.</li>
+    <li><code>tasks_history</code> is trigger-based on the tasks table and will not see link rows. The changelog producer should emit link and unlink as task updates so the audit trail stays complete.</li>
+  </ul>
+
+  <h2>5. Request flow</h2>
+  <svg viewBox="0 0 860 300" width="100%" role="img" aria-label="Request flow between frontends and services">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+    <g fill="var(--panel)" stroke="var(--line)">
+      <rect x="20" y="30" width="200" height="60" rx="8"/>
+      <rect x="20" y="210" width="200" height="60" rx="8"/>
+      <rect x="330" y="120" width="200" height="60" rx="8"/>
+      <rect x="640" y="120" width="200" height="60" rx="8"/>
+    </g>
+    <g fill="var(--fg)" font-size="14" text-anchor="middle">
+      <text x="120" y="55">Email frontend</text><text x="120" y="75" fill="var(--muted)" font-size="12">thread detail</text>
+      <text x="120" y="235">Task frontend</text><text x="120" y="255" fill="var(--muted)" font-size="12">task detail / edit</text>
+      <text x="430" y="145">taskservice</text><text x="430" y="165" fill="var(--muted)" font-size="12">task_links</text>
+      <text x="740" y="145">notificationservice</text><text x="740" y="165" fill="var(--muted)" font-size="12">email_threads</text>
+    </g>
+    <g stroke="var(--fg)" stroke-width="1.5" fill="none" marker-end="url(#arr)" color="var(--fg)">
+      <path d="M220 60 L330 135"/>
+      <path d="M220 240 L330 165"/>
+      <path d="M530 150 L640 150"/>
+      <path d="M120 90 C120 150 160 110 230 100 C300 90 560 60 740 118"/>
+      <path d="M120 210 C120 180 200 220 300 220 C420 220 600 240 740 182"/>
+    </g>
+    <g fill="var(--muted)" font-size="12">
+      <text x="225" y="85">GET /tasks?filters=links.code==thr_x</text>
+      <text x="225" y="225">POST /tasks/:code/links</text>
+      <text x="540" y="140">GetEmailThread (validate)</text>
+      <text x="420" y="50">GET /email-threads/:code, messages</text>
+      <text x="400" y="262">GET /email-threads?filters=code$in:…  (subject, status, activity)</text>
+    </g>
+  </svg>
+
+  <h2>6. UI</h2>
+
+  <h3>Email thread detail → "Tasks" panel</h3>
+  <p>Reuses the existing entity task list widget, pinned to the thread code instead of an entity. The create button prefills the thread link and copies the thread's entity ref into the task's entity link, so a task created from a claim email also lands on that claim.</p>
+  <div class="mock">
+    <div class="head"><b>Tasks (3)</b><span class="btn">+ Create task from this email</span></div>
+    <div class="row th"><span>Subject</span><span>Status</span><span>Priority</span><span>Assignee</span><span>Due</span></div>
+    <div class="row"><span>Request missing documents</span><span><span class="pill">In progress</span></span><span>High</span><span>A. Müller</span><span>2026-10-20</span></div>
+    <div class="row"><span>Confirm coverage question</span><span><span class="pill">To do</span></span><span>Medium</span><span>—</span><span>—</span></div>
+    <div class="row"><span>Follow up on bounce</span><span><span class="pill">Done</span></span><span>Low</span><span>J. Smith</span><span>2026-10-10</span></div>
+  </div>
+
+  <h3>Task detail / edit → "Emails" section</h3>
+  <p>Lists linked threads with subject, entity number, thread status, last message date and message count. Each row links to the thread page. "Link email" opens a thread search backed by the notificationservice list endpoint. Unlink calls the delete endpoint.</p>
+  <div class="mock">
+    <div class="head"><b>Emails (2)</b><span class="btn">+ Link email</span></div>
+    <div class="row th"><span>Subject</span><span>Entity</span><span>Status</span><span>Last message</span><span>Messages</span></div>
+    <div class="row"><span>Re: Claim CLM-2026-0042 documents</span><span>CLM-2026-0042</span><span><span class="pill">open</span></span><span>2 h ago</span><span>5</span></div>
+    <div class="row"><span>Your policy POL-2024-000123</span><span>POL-2024-000123</span><span><span class="pill">closed</span></span><span>3 d ago</span><span>2</span></div>
+  </div>
+  <p>Threads are fetched in one call with a <code>code $in</code> filter. A code that does not come back is rendered as "unavailable" rather than failing the task load.</p>
+
+  <h2>7. Edge cases</h2>
+  <table>
+    <tr><th>Case</th><th>Behaviour</th></tr>
+    <tr><td>Thread deleted or not visible</td><td>Task view shows the code marked unavailable. Link stays until someone removes it.</td></tr>
+    <tr><td>Task deleted</td><td>Links cascade.</td></tr>
+    <tr><td>Thread reassigned to another entity</td><td>The task's own entity link is independent and stays as is. Deliberate: the email link is additional to the entity link.</td></tr>
+    <tr><td>Same thread linked twice</td><td>Unique constraint → 409 or idempotent no-op. Recommend idempotent.</td></tr>
+    <tr><td>Thread from another tenant</td><td>Taskservice validates with the caller's headers, so the lookup is tenant-scoped and returns 404.</td></tr>
+  </table>
+
+  <h2>8. Rollout order</h2>
+  <ol>
+    <li><strong>Protorepo</strong>: <code>TaskLink</code>, new rpcs, thread aggregate fields. Merge first, PR pipelines compile against master.</li>
+    <li><strong>Taskservice</strong>: migration, entity, notificationservice client + resolver, endpoints, list filter, changelog, e2e specs.</li>
+    <li><strong>Notificationservicev2</strong>: <code>message_count</code> and <code>last_message_at</code> on the thread.</li>
+    <li><strong>Frontends</strong>: tasks panel on the thread page, emails section on the task page.</li>
+  </ol>
+
+  <h2>9. Open question for the team</h2>
+  <p>Generic <code>task_links</code> versus a dedicated <code>task_email_threads</code> table. The recommendation is generic: identical cost now, and it spares a second table and a second set of endpoints the next time something needs to hang off a task.</p>
+</main>
+</body>
+</html>
