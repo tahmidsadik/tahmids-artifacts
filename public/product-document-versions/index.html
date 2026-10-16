@@ -1,0 +1,470 @@
+<title>Product Document Versions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~72ch) with a wide band for the simulator; flow drawn as a horizontal pipeline that stacks on phones */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6779;
+  --line: #dde1e8;
+  --accent: #2f5bd3;
+  --old: #b86e00;
+  --old-bg: #fdf1dc;
+  --new: #0f7a62;
+  --new-bg: #dcf3ec;
+  --bad: #c0352b;
+  --bad-bg: #fbe3e0;
+  --code-bg: #eef0f4;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --surface: #1a1f29; --fg: #e4e8ef; --muted: #98a2b4; --line: #2c3342;
+    --accent: #7f9ef0; --old: #f0a63a; --old-bg: #3a2a10; --new: #4fcfae; --new-bg: #0f3229;
+    --bad: #f07b70; --bad-bg: #3d1916; --code-bg: #232937; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --surface: #1a1f29; --fg: #e4e8ef; --muted: #98a2b4; --line: #2c3342;
+  --accent: #7f9ef0; --old: #f0a63a; --old-bg: #3a2a10; --new: #4fcfae; --new-bg: #0f3229;
+  --bad: #f07b70; --bad-bg: #3d1916; --code-bg: #232937; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 56px; }
+.col { max-width: 72ch; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-family: var(--font-display); font-weight: 650; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.65rem; line-height: 1.2; }
+h3 { font-size: 1.02rem; font-weight: 600; }
+p { margin: 0; }
+section { display: grid; gap: 18px; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.lede { font-size: 1.12rem; color: var(--fg); }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+header { display: grid; gap: 16px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.85rem; color: var(--muted); }
+
+.answer { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; display: grid; gap: 12px; }
+.answer strong { font-weight: 600; }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 0.78rem; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.tag.old { background: var(--old-bg); color: var(--old); }
+.tag.new { background: var(--new-bg); color: var(--new); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
+
+/* pipeline */
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.step { padding: 18px 18px 20px; display: grid; gap: 8px; align-content: start; border-right: 1px solid var(--line); position: relative; min-width: 0; }
+.step:last-child { border-right: 0; }
+.step .where { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.step p { font-size: 0.9rem; }
+.step .flaw { font-size: 0.85rem; color: var(--bad); border-top: 1px dashed var(--line); padding-top: 8px; }
+.step .ok { font-size: 0.85rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+@media (max-width: 760px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .step { border-right: 0; border-bottom: 1px solid var(--line); }
+  .step:last-child { border-bottom: 0; }
+}
+
+/* overwrite diagram */
+.disk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .disk { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.panel pre { margin: 0; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; background: var(--code-bg); border-radius: 6px; padding: 12px; overflow-x: auto; }
+.panel .k { color: var(--muted); }
+.panel .o { color: var(--old); }
+.panel .n { color: var(--new); }
+.panel .x { color: var(--bad); text-decoration: line-through; }
+
+/* simulator */
+.sim { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 20px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 18px; }
+.ctl { display: grid; gap: 6px; min-width: 0; }
+.ctl label, .ctl .lbl { font-size: 0.75rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+select { font: inherit; font-size: 0.92rem; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); width: 100%; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; font: inherit; font-size: 0.85rem; padding: 7px 6px; border: 0; background: var(--bg); color: var(--fg); cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 600; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; }
+.stat .num { font-family: var(--font-display); font-size: 1.7rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat .cap { font-size: 0.8rem; color: var(--muted); }
+.stat.good .num { color: var(--new); }
+.stat.warn .num { color: var(--old); }
+.stat.crit .num { color: var(--bad); }
+.summary { font-size: 0.98rem; }
+.tables { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .tables { grid-template-columns: minmax(0, 1fr); } }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--bg); position: sticky; top: 0; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+tr.cut td { opacity: 0.42; }
+tr.cutline td { border-top: 2px dashed var(--bad); }
+td .nm { font-family: var(--font-mono); font-size: 0.78rem; }
+.tblcap { font-size: 0.8rem; color: var(--muted); padding: 8px 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.82rem; color: var(--muted); align-items: center; }
+
+/* proposals */
+.props { display: grid; gap: 14px; }
+.prop { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; gap: 8px; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; }
+.prop .idx { font-family: var(--font-display); font-size: 1.4rem; color: var(--accent); line-height: 1.2; }
+.prop .body { display: grid; gap: 8px; min-width: 0; }
+.prop ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 0.93rem; }
+.prio { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+.prio.p1 { color: var(--bad); } .prio.p2 { color: var(--old); } .prio.p3 { color: var(--muted); }
+.open { border-left: 3px solid var(--old); padding: 4px 0 4px 16px; display: grid; gap: 8px; }
+.open ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+footer { font-size: 0.82rem; color: var(--muted); display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { tr { transition: opacity 0.15s; } }
+</style>
+
+<div class="wrap">
+  <header class="col">
+    <div class="eyebrow">documentservice · notification-core · findings from 16 Oct 2026</div>
+    <h1>Which product documents does a customer actually receive?</h1>
+    <p class="lede">When a workflow sends product documents with a lead or policy email, documentservice ignores the product version. Two more problems decide what lands in the inbox: only the first page of documents is fetched, and on staging notification-core overwrites attachments that share a file name.</p>
+    <div class="meta"><span>Data: read-only queries on test and staging, 16 Oct 2026</span><span>Code: documentservicev2 master, @emilgroup/core 11.40.0, notification-core 27624f7</span></div>
+  </header>
+
+  <section class="col">
+    <div class="answer">
+      <h3>The short answer</h3>
+      <p>The customer should get the documents of <strong>the product version their policy or lead is on</strong>. Today they get documents from <strong>every version</strong> of the product, oldest first, cut off after one page.</p>
+      <p>On staging that has two outcomes for the big Allianz products. With the default page size of 10, customers get <span class="tag old">only the old version</span> and the latest version is never fetched. With a page size big enough to hold everything, the overwrite bug makes the <span class="tag new">latest version</span> win every name conflict, but the email still carries one copy per version.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col" style="display:grid;gap:10px">
+      <div class="eyebrow">How a document gets to the inbox</div>
+      <h2>Three problems along one path</h2>
+    </div>
+    <div class="flow">
+      <div class="step">
+        <div class="where">BPMN · document:product_document_list</div>
+        <h3>1. Workflow asks for documents</h3>
+        <p>The worker reads the product slug from the job (<code>productSlug</code>, <code>payload.productSlug</code> or <code>payload.policy.product.slug</code>) plus optional filters and <code>pageSize</code>.</p>
+        <div class="flaw">The policy's or lead's product version is never read.</div>
+      </div>
+      <div class="step">
+        <div class="where">ProductDocumentEntityQuery</div>
+        <h3>2. Query by slug only</h3>
+        <p><code>product_slug = X</code>, plus type or slug filters. <code>productVersionId</code> isn't a filterable column, so the BPMN can't add it either.</p>
+        <div class="flaw">Returns every version's documents.</div>
+      </div>
+      <div class="step">
+        <div class="where">paginateList → nestjs-paginate</div>
+        <h3>3. Oldest first, one page</h3>
+        <p>No sort is passed, so nestjs-paginate falls back to <code>sortableColumns[0]</code>, which is <code>id ASC</code>. Page size defaults to 10, at most 50. Only page 1 is used.</p>
+        <div class="flaw">Newest documents fall off the end.</div>
+      </div>
+      <div class="step">
+        <div class="where">notification-core · downloadAttachmentsToTmp</div>
+        <h3>4. Download and attach</h3>
+        <p>Every attachment goes to <code>/tmp/&lt;uuid&gt;/&lt;name&gt;</code>. Attachments with the same name share one path, so each download overwrites the previous one.</p>
+        <div class="flaw">Staging only. Fixed in 27624f7 (PPL-1142).</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col" style="display:grid;gap:10px">
+      <div class="eyebrow">The staging overwrite</div>
+      <h2>Last download wins, but every attachment is still sent</h2>
+      <p>The loop runs in list order. Each entry in <code>FileAttachments</code> keeps its own index but points at the shared path. The email is built after all downloads finish, so every same-named attachment reads the file that was written last.</p>
+    </div>
+    <div class="disk">
+      <div class="panel">
+        <h3>Before the fix</h3>
+<pre><span class="k"># attachments in list order (id ASC)</span>
+[0] <span class="o">v6996</span>  → /tmp/a1/allianz_phv_ipid.pdf
+[1] <span class="n">v7001</span>  → /tmp/a1/allianz_phv_ipid.pdf  <span class="k">overwrites [0]</span>
+
+<span class="k"># built email</span>
+allianz_phv_ipid.pdf  <span class="k">content:</span> <span class="n">v7001</span>
+allianz_phv_ipid.pdf  <span class="k">content:</span> <span class="n">v7001</span></pre>
+        <p class="muted" style="font-size:0.88rem">Two attachments with the same name and identical content. The v6996 file is gone.</p>
+      </div>
+      <div class="panel">
+        <h3>After 27624f7</h3>
+<pre><span class="k"># one directory per attachment index</span>
+[0] <span class="o">v6996</span>  → /tmp/a1/0/allianz_phv_ipid.pdf
+[1] <span class="n">v7001</span>  → /tmp/a1/1/allianz_phv_ipid.pdf
+
+<span class="k"># built email</span>
+allianz_phv_ipid.pdf  <span class="k">content:</span> <span class="o">v6996</span>
+allianz_phv_ipid.pdf  <span class="k">content:</span> <span class="n">v7001</span></pre>
+        <p class="muted" style="font-size:0.88rem">No data loss, but the customer now clearly gets both versions. The fix makes the documentservice problem easier to see. It doesn't solve it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col" style="display:grid;gap:10px">
+      <div class="eyebrow">Simulator · real rows from test and staging</div>
+      <h2>What lands in the inbox</h2>
+      <p>Pick a product and the settings the workflow uses. The left table is the query result in <code>id</code> order. The right table is what the email contains. I couldn't see the tenants' BPMNs, so the page size and the attachment naming are your inputs.</p>
+    </div>
+    <div class="sim">
+      <div class="controls">
+        <div class="ctl">
+          <label for="ds">Product</label>
+          <select id="ds"></select>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="ps-l">Page size in BPMN</span>
+          <div class="seg" id="ps" role="group" aria-labelledby="ps-l">
+            <button type="button" data-v="10" aria-pressed="true">10 (default)</button>
+            <button type="button" data-v="25" aria-pressed="false">25</button>
+            <button type="button" data-v="50" aria-pressed="false">50 (max)</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <label for="nm">Attachment named after</label>
+          <select id="nm">
+            <option value="slug">Original s3Key → {slug}.pdf</option>
+            <option value="file">filename column</option>
+            <option value="uniq">Cloned instance key (unique)</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="nc-l">notification-core</span>
+          <div class="seg" id="nc" role="group" aria-labelledby="nc-l">
+            <button type="button" data-v="bug" aria-pressed="true">Staging (bug)</button>
+            <button type="button" data-v="fixed" aria-pressed="false">Fixed</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="verdict" id="verdict"></div>
+      <p class="summary" id="summary"></p>
+
+      <div class="legend">
+        <span><span class="tag old">v old</span> older product version</span>
+        <span><span class="tag new">v latest</span> latest product version</span>
+        <span><span class="tag bad">overwritten</span> content replaced by a later download</span>
+        <span>Faded rows: not on page 1</span>
+      </div>
+
+      <div class="tables">
+        <div class="tbl">
+          <div class="tblcap">Query result · product_slug only · id ASC</div>
+          <table>
+            <thead><tr><th>#</th><th>id</th><th>Version</th><th>Slug</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="tbl">
+          <div class="tblcap">Email attachments in order</div>
+          <table>
+            <thead><tr><th>#</th><th>Attachment name</th><th>Content from</th></tr></thead>
+            <tbody id="atts"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <div class="eyebrow">Data findings</div>
+    <h2>What the databases show</h2>
+    <ul style="margin:0;padding-left:1.1em;display:grid;gap:10px">
+      <li><strong>Where a name conflicts, the latest version always has the higher id.</strong> That held for all 33 conflicting groups on test and all 23 on staging, because tenants created documents one version after another. So with the overwrite bug, the latest version wins whenever it's fetched at all.</li>
+      <li><strong>The page size decides more than the overwrite bug does.</strong> In <code>bas-stage/allianz_phv</code>, <code>allianz_wgv</code>, <code>emil-demo/allianz_phv</code> and <code>garantiemax-test/kitchen-comfort</code>, the old version fills ids 1–10. With page size 10 there's no conflict at all; customers just get the outdated set.</li>
+      <li><strong><code>bas-stage/allianz_vh</code> version 6997 holds liability (PHV) documents.</strong> All eleven of its rows use <code>allianz_phv_*</code> slugs. With page size 10, a household (Hausrat) customer is sent liability terms and none of the household terms on version 7000. This looks like a data error to fix separately.</li>
+      <li><strong>Filenames repeat within one version.</strong> In <code>allianz_phv</code>, the <code>couples</code>, <code>family</code> and <code>single</code> documents share one filename. If notification-core names attachments after the <code>filename</code> column, they overwrite each other even inside a single version.</li>
+      <li><strong>Id order doesn't always match version order.</strong> In <code>enzo-test/hausratversicherung</code>, version 724's document is older than version 628's. No conflict there today, but "highest id wins" is not a safe stand-in for "latest version".</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="col" style="display:grid;gap:10px">
+      <div class="eyebrow">Proposals</div>
+      <h2>How to fix it</h2>
+      <p>Proposals 1 and 2 fix the behaviour. 3 and 4 limit the damage until then and clean up what the investigation found.</p>
+    </div>
+    <div class="props">
+      <div class="prop">
+        <div class="idx">1</div>
+        <div class="body">
+          <div class="prio p1">Must · documentservice</div>
+          <h3>Send the documents of the entity's product version</h3>
+          <ul>
+            <li>Add <code>productVersionId</code> to <code>filterableColumns</code> in <code>product-document.config.ts</code> and a <code>filterByProductVersionId</code> to <code>ProductDocumentEntityQuery</code>.</li>
+            <li>In the <code>ListProductDocument</code> worker, read the version from the job, for example <code>productVersionId</code>, then <code>payload.policy.productVersionId</code>, then the lead's version, and always filter on it.</li>
+            <li>If no version can be found, fail the task with a clear error. Never fall back silently to all versions.</li>
+            <li>Roll out per tenant at first, using a custom header such as <code>matchProductVersion: true</code>, so existing BPMNs that work around today's behaviour don't change overnight. Make it the default once tenants are checked.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="prop">
+        <div class="idx">2</div>
+        <div class="body">
+          <div class="prio p1">Must · documentservice</div>
+          <h3>Fetch every page, in an explicit order</h3>
+          <ul>
+            <li>Follow <code>nextPageToken</code> in the worker until it's empty, so a product with more than 10 or 50 documents isn't cut short.</li>
+            <li>Pass an explicit <code>order</code> instead of relying on nestjs-paginate's fallback, so the attachment order is a decision and not an accident.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="prop">
+        <div class="idx">3</div>
+        <div class="body">
+          <div class="prio p2">Should · notification-core</div>
+          <h3>Ship the overwrite fix and make names unique</h3>
+          <ul>
+            <li>Deploy 27624f7 (PPL-1142) to staging. It stops data loss but, until 1 and 2 land, customers will visibly get both versions.</li>
+            <li>When two attachments in one email share a name, add a suffix (<code>AVB (2).pdf</code>) so the customer can tell them apart.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="prop">
+        <div class="idx">4</div>
+        <div class="body">
+          <div class="prio p3">Could · data and config</div>
+          <h3>Clean up data and check the workflows</h3>
+          <ul>
+            <li>Fix <code>bas-stage/allianz_vh</code> version 6997, which holds PHV documents.</li>
+            <li>List every BPMN that uses <code>document:product_document_list</code> and record its <code>pageSize</code>, filters and attachment mapping. That tells us which simulator setting each tenant is on today.</li>
+            <li>Add a test that lists documents for a product with two versions and asserts only the policy's version comes back.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <div class="open">
+      <h3>Needs a product decision</h3>
+      <ul>
+        <li><strong>Missing document on the policy's version.</strong> If version 3 has no <code>terms</code> because the tenant only re-uploaded changed files, should we send the newest earlier version's <code>terms</code>? Exact match is simplest. "Newest per slug at or below the policy's version" fits tenants who upload only changes.</li>
+        <li><strong>Leads.</strong> Check in insuranceservice that lead payloads carry a product version the way policies do.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="col">
+    <span>Queries ran in a read-only transaction from a documentservice pod in the TestingBackendServices and StagingBackendServices clusters. Soft-deleted rows are excluded.</span>
+    <span>Code references: <code>document.worker.ts</code> (ListProductDocument), <code>product-document.service.ts</code> (listProductDocuments), <code>product-document.config.ts</code>, <code>@emilgroup/core</code> paginate-list, notification-core <code>pkg/email/sender.go</code>.</span>
+  </footer>
+</div>
+
+<script>
+const DATA = {"staging|bas-stage|allianz_phv":[{"id":815,"v":6996,"type":"pre-application","slug":"allianz_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"},{"id":816,"v":6996,"type":"pre-application","slug":"allianz_phv_couples","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":817,"v":6996,"type":"pre-application","slug":"allianz_phv_family","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":818,"v":6996,"type":"pre-application","slug":"allianz_phv_haushaltshaftpflichtPlus","file":"Versicherungsbedingungen HaushaltshaftpflichtPlus","ct":"pdf"},{"id":819,"v":6996,"type":"pre-application","slug":"allianz_phv_ipid","file":"Produktinformationsblatt Haftpflichtversicherung","ct":"pdf"},{"id":820,"v":6996,"type":"pre-application","slug":"allianz_phv_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":821,"v":6996,"type":"pre-application","slug":"allianz_phv_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":822,"v":6996,"type":"pre-application","slug":"allianz_phv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":823,"v":6996,"type":"pre-application","slug":"allianz_professionalLiability","file":"Versicherungsbedingungen Diensthaftpflicht Plus","ct":"pdf"},{"id":824,"v":6996,"type":"pre-application","slug":"allianz_phv_single","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":825,"v":6996,"type":"pre-application","slug":"allianz_rentersCover","file":"Versicherungsbedingungen VermieterPlus","ct":"pdf"},{"id":938,"v":7001,"type":"pre-application","slug":"allianz_phv_couples","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":939,"v":7001,"type":"pre-application","slug":"allianz_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"},{"id":940,"v":7001,"type":"pre-application","slug":"allianz_phv_haushaltshaftpflichtPlus","file":"Versicherungsbedingungen HaushaltshaftpflichtPlus","ct":"pdf"},{"id":941,"v":7001,"type":"pre-application","slug":"allianz_phv_family","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":942,"v":7001,"type":"pre-application","slug":"allianz_phv_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":943,"v":7001,"type":"pre-application","slug":"allianz_phv_ipid","file":"Produktinformationsblatt Haftpflichtversicherung","ct":"pdf"},{"id":944,"v":7001,"type":"pre-application","slug":"allianz_phv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":945,"v":7001,"type":"pre-application","slug":"allianz_phv_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":946,"v":7001,"type":"pre-application","slug":"allianz_professionalLiability","file":"Versicherungsbedingungen DiensthaftpflichtPlus","ct":"pdf"},{"id":947,"v":7001,"type":"pre-application","slug":"allianz_phv_single","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":948,"v":7001,"type":"pre-application","slug":"allianz_rentersCover","file":"Versicherungsbedingungen VermieterPlus","ct":"pdf"}],"staging|bas-stage|allianz_vh":[{"id":826,"v":6997,"type":"pre-application","slug":"allianz_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"},{"id":827,"v":6997,"type":"pre-application","slug":"allianz_phv_haushaltshaftpflichtPlus","file":"Versicherungsbedingungen HaushaltshaftpflichtPlus","ct":"pdf"},{"id":828,"v":6997,"type":"pre-application","slug":"allianz_phv_couples","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":829,"v":6997,"type":"pre-application","slug":"allianz_phv_family","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":830,"v":6997,"type":"pre-application","slug":"allianz_phv_ipid","file":"Produktinformationsblatt Haftpflichtversicherung","ct":"pdf"},{"id":831,"v":6997,"type":"pre-application","slug":"allianz_phv_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":832,"v":6997,"type":"pre-application","slug":"allianz_phv_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":833,"v":6997,"type":"pre-application","slug":"allianz_phv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":834,"v":6997,"type":"pre-application","slug":"allianz_phv_single","file":"Allgemeine Versicherungsbedingungen Private Haftpflichtversicherung","ct":"pdf"},{"id":835,"v":6997,"type":"pre-application","slug":"allianz_professionalLiability","file":"Versicherungsbedingungen Diensthaftpflicht Plus","ct":"pdf"},{"id":836,"v":6997,"type":"pre-application","slug":"allianz_rentersCover","file":"Versicherungsbedingungen VermieterPlus","ct":"pdf"},{"id":924,"v":7000,"type":"pre-application","slug":"allianz_vhv_elementarPlus","file":"Versicherungsbedingungen ElementarPlus","ct":"pdf"},{"id":925,"v":7000,"type":"pre-application","slug":"allianz_vhv_fahrradBest","file":"Versicherungsbedingungen FahrradBest","ct":"pdf"},{"id":926,"v":7000,"type":"pre-application","slug":"allianz_vhv_fahrradPlus","file":"Versicherungsbedingungen FahrradPlus","ct":"pdf"},{"id":927,"v":7000,"type":"pre-application","slug":"allianz_vhv_glas","file":"Versicherungsbedingungen Glas und FensterPlus","ct":"pdf"},{"id":928,"v":7000,"type":"pre-application","slug":"allianz_vhv_internet","file":"Versicherungsbedingungen Internetschutz","ct":"pdf"},{"id":929,"v":7000,"type":"pre-application","slug":"allianz_vhv_hws","file":"Haus- und Wohnungsschutzbrief","ct":"pdf"},{"id":930,"v":7000,"type":"pre-application","slug":"allianz_vhv_ipid","file":"Produktinformationsblatt Hausratversicherung","ct":"pdf"},{"id":931,"v":7000,"type":"pre-application","slug":"allianz_vhv_meinPlus","file":"Versicherungsbedingungen MeinPlus","ct":"pdf"},{"id":932,"v":7000,"type":"pre-application","slug":"allianz_vhv_mobilPlus","file":"Versicherungsbedingungen MobilPlus","ct":"pdf"},{"id":933,"v":7000,"type":"pre-application","slug":"allianz_vhv_tc_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":934,"v":7000,"type":"pre-application","slug":"allianz_vhv_tc","file":"Allgemeine Versicherungsbedingungen Hausratversicherung","ct":"pdf"},{"id":935,"v":7000,"type":"pre-application","slug":"allianz_vhv_wohnenPlus","file":"Versicherungsbedingungen WohnenPlus","ct":"pdf"},{"id":936,"v":7000,"type":"pre-application","slug":"allianz_vhv_tc_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":937,"v":7000,"type":"pre-application","slug":"allianz_vhv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"}],"staging|bas-stage|allianz_wgv":[{"id":837,"v":6998,"type":"pre-application","slug":"allianz_wgv_RohrbruchBest","file":"Versicherungsbedingungen RohrbruchBest","ct":"pdf"},{"id":838,"v":6998,"type":"pre-application","slug":"allianz_wgv_glas","file":"Versicherungsbedingungen GlasFensterPlus","ct":"pdf"},{"id":839,"v":6998,"type":"pre-application","slug":"allianz_wgv_gebaudePlus","file":"Versicherungsbedingungen GebäudePlus","ct":"pdf"},{"id":840,"v":6998,"type":"pre-application","slug":"allianz_wgv_grundstuckPlus","file":"Versicherungsbedingungen GrundstückPlus","ct":"pdf"},{"id":841,"v":6998,"type":"pre-application","slug":"allianz_wgv_haushaltshaftpflichtPlus","file":"Versicherungsbedingungen HaushaltshaftpflichtPlus","ct":"pdf"},{"id":842,"v":6998,"type":"pre-application","slug":"allianz_wgv_hws","file":"Haus- und Wohnungsschutzbrief","ct":"pdf"},{"id":843,"v":6998,"type":"pre-application","slug":"allianz_wgv_haustechnikPlus","file":"Versicherungsbedingungen HaustechnikPlus","ct":"pdf"},{"id":844,"v":6998,"type":"pre-application","slug":"allianz_wgv_ipid","file":"Produktinformationsblatt Wohngebäudeversicherung","ct":"pdf"},{"id":845,"v":6998,"type":"pre-application","slug":"allianz_wgv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":846,"v":6998,"type":"pre-application","slug":"allianz_wgv_tc","file":"Allgemeine Versicherungsbedingungen Wohngebäudeversicherung","ct":"pdf"},{"id":847,"v":6998,"type":"pre-application","slug":"allianz_wgv_tc_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":848,"v":6998,"type":"pre-application","slug":"allianz_wgv_tc_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":910,"v":6999,"type":"pre-application","slug":"allianz_wgv_RohrbruchBest","file":"Versicherungsbedingungen RohrbruchBest","ct":"pdf"},{"id":911,"v":6999,"type":"pre-application","slug":"allianz_wgv_gebaudePlus","file":"Versicherungsbedingungen GebäudePlus","ct":"pdf"},{"id":912,"v":6999,"type":"pre-application","slug":"allianz_wgv_glas","file":"Versicherungsbedingungen Glas und FensterPlus","ct":"pdf"},{"id":913,"v":6999,"type":"pre-application","slug":"allianz_wgv_haushaltshaftpflichtPlus","file":"Versicherungsbedingungen HaushaltshaftpflichtPlus","ct":"pdf"},{"id":914,"v":6999,"type":"pre-application","slug":"allianz_wgv_grundstuckPlus","file":"Versicherungsbedingungen GrundstückPlus","ct":"pdf"},{"id":915,"v":6999,"type":"pre-application","slug":"allianz_wgv_haustechnikPlus","file":"Versicherungsbedingungen HaustechnikPlus","ct":"pdf"},{"id":916,"v":6999,"type":"pre-application","slug":"allianz_wgv_hws","file":"Haus- und Wohnungsschutzbrief","ct":"pdf"},{"id":917,"v":6999,"type":"pre-application","slug":"allianz_wgv_tc","file":"Allgemeine Versicherungsbedingungen Wohngebäudeversicherung","ct":"pdf"},{"id":918,"v":6999,"type":"pre-application","slug":"allianz_wgv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":919,"v":6999,"type":"pre-application","slug":"allianz_wgv_ipid","file":"Produktinformationsblatt Wohngebäudeversicherung","ct":"pdf"},{"id":920,"v":6999,"type":"pre-application","slug":"allianz_wgv_tc_partC","file":"Allgemeine Versicherungsbedingungen Teil C","ct":"pdf"},{"id":921,"v":6999,"type":"pre-application","slug":"allianz_wgv_tc_partB","file":"Allgemeine Versicherungsbedingungen Teil B","ct":"pdf"},{"id":922,"v":6999,"type":"pre-application","slug":"allianz_wgv_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"}],"staging|myway-stage|myway_camper_basic":[{"id":129,"v":2352,"type":"pre-application","slug":"myway_camper_basic-9vAKGC","file":"Allianz_Datenschutzinformationsblatt.pdf","ct":"pdf"},{"id":130,"v":2352,"type":"pre-application","slug":"myway_camper_basic-5SA9DY","file":"KFZ_Kündigungsvorlage.pdf","ct":"pdf"},{"id":370,"v":3833,"type":"pre-application","slug":"myway_camper_basic-S12ux9","file":"Allgemeine_Versicherungsbedingungen_AVB.pdf","ct":"pdf"},{"id":371,"v":3833,"type":"pre-application","slug":"myway_camper_basic-b7Hqu3","file":"Produktinformation.pdf","ct":"pdf"}],"testing|emil-demo|allianz_phv":[{"id":790,"v":2123,"type":"pre-application","slug":"allianz_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"},{"id":791,"v":2123,"type":"pre-application","slug":"allianz_phv_family","file":"Allgemeine Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":792,"v":2123,"type":"pre-application","slug":"allianz_phv_couples","file":"Allgemeine Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":793,"v":2123,"type":"pre-application","slug":"allianz_phv_ipid","file":"Produktinformationsblatt Haftpflichtversicherung","ct":"pdf"},{"id":794,"v":2123,"type":"pre-application","slug":"allianz_phv_partB","file":"AVB Teil B","ct":"pdf"},{"id":795,"v":2123,"type":"pre-application","slug":"allianz_phv_single","file":"Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":796,"v":2123,"type":"pre-application","slug":"allianz_phv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":797,"v":2123,"type":"pre-application","slug":"allianz_phv_partC","file":"AVB Teil C","ct":"pdf"},{"id":798,"v":2123,"type":"pre-application","slug":"allianz_professionalLiability","file":"Versicherungsbedingungen Diensthaftpflicht Plus","ct":"pdf"},{"id":799,"v":2123,"type":"pre-application","slug":"allianz_rentersCover","file":"Versicherungsbedingungen VermieterPlus","ct":"pdf"},{"id":843,"v":2123,"type":"pre-application","slug":"allianz_rentersCover_conflict","file":"Versicherungsbedingungen VermieterPlus (Conflict)","ct":"pdf"},{"id":851,"v":2542,"type":"pre-application","slug":"allianz_oiltankPlus","file":"Versicherungsbedingungen ÖltankPlus","ct":"pdf"},{"id":852,"v":2542,"type":"pre-application","slug":"allianz_phv_couples","file":"Allgemeine Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":853,"v":2542,"type":"pre-application","slug":"allianz_phv_family","file":"Allgemeine Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":854,"v":2542,"type":"pre-application","slug":"allianz_phv_ipid","file":"Produktinformationsblatt Haftpflichtversicherung","ct":"pdf"},{"id":855,"v":2542,"type":"pre-application","slug":"allianz_phv_partB","file":"AVB Teil B","ct":"pdf"},{"id":856,"v":2542,"type":"pre-application","slug":"allianz_phv_partC","file":"AVB Teil C","ct":"pdf"},{"id":857,"v":2542,"type":"pre-application","slug":"allianz_phv_sideletter","file":"Sideletter zu den Vertragsbedingungen","ct":"pdf"},{"id":858,"v":2542,"type":"pre-application","slug":"allianz_phv_single","file":"Versicherungsbedingungen Haftpflicht","ct":"pdf"},{"id":859,"v":2542,"type":"pre-application","slug":"allianz_professionalLiability","file":"Versicherungsbedingungen Diensthaftpflicht Plus","ct":"pdf"},{"id":860,"v":2542,"type":"pre-application","slug":"allianz_rentersCover","file":"Versicherungsbedingungen VermieterPlus","ct":"pdf"},{"id":861,"v":2542,"type":"pre-application","slug":"allianz_rentersCover_conflict","file":"Versicherungsbedingungen VermieterPlus (Conflict)","ct":"pdf"}],"testing|funk-test|funk-pv":[{"id":126,"v":987,"type":"pre-application","slug":"funk-pv-HoTKBH","file":"Leistungsubersicht.pdf","ct":"pdf"},{"id":127,"v":987,"type":"pre-application","slug":"funk-pv-75AmPY","file":"Versicherungsbedingungen.pdf","ct":"pdf"},{"id":204,"v":987,"type":"pre-application","slug":"funk-pv-IPID1","file":"IPID_Photovoltaik.pdf","ct":"pdf"},{"id":502,"v":1479,"type":"pre-application","slug":"funk-pv-75AmPY","file":"Versicherungsbedingungen.pdf","ct":"pdf"},{"id":503,"v":1479,"type":"pre-application","slug":"funk-pv-HoTKBH","file":"Leistungsubersicht.pdf","ct":"pdf"},{"id":504,"v":1479,"type":"pre-application","slug":"funk-pv-IPID1","file":"IPID_Photovoltaik.pdf","ct":"pdf"}],"testing|garantiemax-test|kitchen-comfort":[{"id":883,"v":3424,"type":"post-application","slug":"claim-how-to","file":"Schadensfall How To","ct":"pdf"},{"id":884,"v":3424,"type":"pre-confirmation","slug":"cancellation-policy-at","file":"Rücktrittsbelehrung","ct":"pdf"},{"id":885,"v":3424,"type":"pre-application","slug":"customer-information","file":"Kundeninformation","ct":"pdf"},{"id":886,"v":3424,"type":"pre-application","slug":"data-protection-information","file":"Datenschutzhinweis","ct":"pdf"},{"id":887,"v":3424,"type":"pre-confirmation","slug":"general-insurance-conditions-at","file":"AVB","ct":"pdf"},{"id":888,"v":3424,"type":"pre-confirmation","slug":"general-insurance-conditions-de","file":"AVB","ct":"pdf"},{"id":889,"v":3424,"type":"pre-application","slug":"general-terms-and-conditions","file":"AGB","ct":"pdf"},{"id":890,"v":3424,"type":"pre-confirmation","slug":"information-on-data-processing","file":"Information zur Datenverarbeitung","ct":"pdf"},{"id":891,"v":3424,"type":"pre-application","slug":"how-to","file":"How To","ct":"pdf"},{"id":892,"v":3424,"type":"pre-application","slug":"pre-contractual-information","file":"Erstinformation","ct":"pdf"},{"id":893,"v":3424,"type":"pre-confirmation","slug":"insurance-product-information-document","file":"IPID","ct":"pdf"},{"id":894,"v":3431,"type":"pre-confirmation","slug":"cancellation-policy-at","file":"Rücktrittsbelehrung","ct":"pdf"},{"id":895,"v":3431,"type":"post-application","slug":"claim-how-to","file":"Schadensfall How To","ct":"pdf"},{"id":896,"v":3431,"type":"pre-application","slug":"customer-information","file":"Kundeninformation","ct":"pdf"},{"id":897,"v":3431,"type":"pre-application","slug":"data-protection-information","file":"Datenschutzhinweis","ct":"pdf"},{"id":898,"v":3431,"type":"pre-confirmation","slug":"general-insurance-conditions-at","file":"AVB","ct":"pdf"},{"id":899,"v":3431,"type":"pre-confirmation","slug":"general-insurance-conditions-de","file":"AVB","ct":"pdf"},{"id":900,"v":3431,"type":"pre-application","slug":"general-terms-and-conditions","file":"AGB","ct":"pdf"},{"id":901,"v":3431,"type":"pre-confirmation","slug":"information-on-data-processing","file":"Information zur Datenverarbeitung","ct":"pdf"},{"id":902,"v":3431,"type":"pre-application","slug":"how-to","file":"How To","ct":"pdf"},{"id":903,"v":3431,"type":"pre-confirmation","slug":"insurance-product-information-document","file":"IPID","ct":"pdf"},{"id":904,"v":3431,"type":"pre-application","slug":"pre-contractual-information","file":"Erstinformation","ct":"pdf"}]};
+const LABELS = {
+  "staging|bas-stage|allianz_phv": "staging · bas-stage · allianz_phv",
+  "staging|bas-stage|allianz_wgv": "staging · bas-stage · allianz_wgv",
+  "staging|bas-stage|allianz_vh": "staging · bas-stage · allianz_vh",
+  "staging|myway-stage|myway_camper_basic": "staging · myway-stage · myway_camper_basic",
+  "testing|emil-demo|allianz_phv": "test · emil-demo · allianz_phv",
+  "testing|garantiemax-test|kitchen-comfort": "test · garantiemax-test · kitchen-comfort",
+  "testing|funk-test|funk-pv": "test · funk-test · funk-pv"
+};
+const state = { ds: "staging|bas-stage|allianz_phv", ps: 10, nm: "slug", nc: "bug" };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const sel = $("ds");
+Object.keys(LABELS).forEach((k) => {
+  const o = document.createElement("option");
+  o.value = k; o.textContent = LABELS[k]; sel.appendChild(o);
+});
+sel.value = state.ds;
+sel.addEventListener("change", () => { state.ds = sel.value; render(); });
+$("nm").addEventListener("change", (e) => { state.nm = e.target.value; render(); });
+function seg(id, key, num) {
+  $(id).querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    $(id).querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    state[key] = num ? Number(b.dataset.v) : b.dataset.v;
+    render();
+  }));
+}
+seg("ps", "ps", true);
+seg("nc", "nc", false);
+
+function attName(r) {
+  if (state.nm === "slug") return r.slug + "." + r.ct;
+  if (state.nm === "file") return /\.[a-z0-9]{2,4}$/i.test(r.file) ? r.file : r.file + "." + r.ct;
+  return r.type + "_" + r.id + "." + r.ct;
+}
+function vtag(v, latest) {
+  return '<span class="tag ' + (v === latest ? "new" : "old") + '">v' + v + "</span>";
+}
+
+function render() {
+  const rows = DATA[state.ds].slice().sort((a, b) => a.id - b.id);
+  const latest = Math.max(...rows.map((r) => r.v));
+  const fetched = rows.slice(0, state.ps);
+
+  $("rows").innerHTML = rows.map((r, i) => {
+    const cls = [i >= state.ps ? "cut" : "", i === state.ps ? "cutline" : ""].join(" ").trim();
+    return '<tr class="' + cls + '"><td class="num">' + (i + 1) + '</td><td class="num">' + r.id + "</td><td>" + vtag(r.v, latest) + '</td><td><span class="nm">' + esc(r.slug) + "</span></td></tr>";
+  }).join("");
+
+  const names = fetched.map(attName);
+  const lastIdx = {};
+  names.forEach((n, i) => { lastIdx[n] = i; });
+  const atts = fetched.map((r, i) => {
+    const src = state.nc === "bug" ? fetched[lastIdx[names[i]]] : r;
+    return { own: r, src, name: names[i], over: src !== r };
+  });
+
+  $("atts").innerHTML = atts.map((a, i) => {
+    const content = a.over
+      ? vtag(a.src.v, latest) + ' <span class="tag bad">overwritten</span> <span class="muted mono">was v' + a.own.v + "</span>"
+      : vtag(a.src.v, latest);
+    return '<tr><td class="num">' + (i + 1) + '</td><td><span class="nm">' + esc(a.name) + "</span></td><td>" + content + "</td></tr>";
+  }).join("");
+
+  const fromLatest = atts.filter((a) => a.src.v === latest).length;
+  const fromOld = atts.length - fromLatest;
+  const latestRows = rows.filter((r) => r.v === latest);
+  const latestMissing = latestRows.filter((r) => !fetched.includes(r)).length;
+  const counts = {};
+  names.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
+  const dupes = names.filter((n) => counts[n] > 1).length;
+  const lost = atts.filter((a) => a.over).length;
+
+  $("verdict").innerHTML = [
+    ["", atts.length, "attachments sent"],
+    [fromOld ? "crit" : "good", fromOld, "from an older version"],
+    [latestMissing ? "crit" : "good", latestMissing + " / " + latestRows.length, "latest-version docs not fetched"],
+    [dupes ? "warn" : "good", dupes, "attachments sharing a name"],
+    [lost ? "warn" : "good", lost, "overwritten on download"]
+  ].map(([c, n, cap]) => '<div class="stat ' + c + '"><span class="num">' + n + '</span><span class="cap">' + cap + "</span></div>").join("");
+
+  let s;
+  if (latestMissing === latestRows.length) {
+    s = "The latest version (v" + latest + ") never makes it onto page 1. The customer gets " + atts.length + " documents, all from older versions.";
+  } else if (fromOld === 0 && latestMissing === 0 && dupes === 0) {
+    s = "All " + atts.length + " attachments are latest-version documents, with nothing missing. This matches the correct result for a policy on v" + latest + ".";
+  } else {
+    const parts = [];
+    parts.push("The customer gets " + atts.length + " attachments: " + fromLatest + " with v" + latest + " content and " + fromOld + " with older content.");
+    if (lost) parts.push(lost + " older files were overwritten, so " + lost + " attachments are duplicates of a latest-version file under the same name.");
+    if (latestMissing) parts.push(latestMissing + " latest-version documents were cut off by the page size.");
+    s = parts.join(" ");
+  }
+  s += " For a policy on v" + latest + ", the correct result is " + latestRows.length + " documents, all from v" + latest + ".";
+  $("summary").textContent = s;
+}
+render();
+</script>

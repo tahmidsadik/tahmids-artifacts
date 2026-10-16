@@ -1,5 +1,12 @@
 [
   {
+    "slug": "product-document-versions",
+    "title": "Product Document Versions",
+    "summary": "Why customers receive the wrong product-document versions, with real test and staging data, a simulator and proposed fixes.",
+    "date": "2026-10-16",
+    "updated": "2026-10-16"
+  },
+  {
     "slug": "task-email-links",
     "title": "Task \u2194 Email Links",
     "summary": "Interactive design proposal for relating tasks to email threads (schema, many-to-many sandbox, write flows, sync), plus the six-PR implementation plan.",
