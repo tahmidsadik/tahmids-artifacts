@@ -2,7 +2,7 @@
   {
     "slug": "task-email-links",
     "title": "Task \u2194 Email Links",
-    "summary": "Design proposal for relating tasks to email threads across taskservice and notificationservice.",
+    "summary": "Interactive design proposal for relating tasks to email threads: schema, many-to-many sandbox, write flows, sync.",
     "date": "2026-10-15",
     "updated": "2026-10-16"
   }

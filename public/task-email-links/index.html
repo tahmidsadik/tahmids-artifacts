@@ -6,185 +6,327 @@
 <title>Task Email Links</title>
 <style>
   :root {
-    --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e5e8;
-    --panel: #f6f7f9; --accent: #1f5fbf; --accent-bg: #e8f0fe; --warn-bg: #fff4e5; --warn: #8a5300;
-    --code-bg: #f1f3f5; --new: #1e7f4f; --new-bg: #e6f6ec; --derived: #6b3fb5; --derived-bg: #f0e9fb;
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e5e8; --panel: #f6f7f9;
+    --accent: #1f5fbf; --accent-bg: #e8f0fe; --warn-bg: #fff4e5; --warn: #8a5300; --code-bg: #f1f3f5;
+    --new: #1e7f4f; --new-bg: #e6f6ec; --derived: #6b3fb5; --derived-bg: #f0e9fb;
+    --task: #b45309; --task-bg: #fef3c7; --thread: #0e7490; --thread-bg: #cffafe; --danger: #b91c1c; --danger-bg: #fee2e2;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
-      --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
-      --code-bg: #22262c; --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+      --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36; --panel: #1b1e23;
+      --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c; --code-bg: #22262c;
+      --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+      --task: #fbbf24; --task-bg: #3b2f0c; --thread: #67e8f9; --thread-bg: #0f3540; --danger: #f87171; --danger-bg: #3f1515;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
-    --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
-    --code-bg: #22262c; --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+    --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36; --panel: #1b1e23;
+    --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c; --code-bg: #22262c;
+    --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+    --task: #fbbf24; --task-bg: #3b2f0c; --thread: #67e8f9; --thread-bg: #0f3540; --danger: #f87171; --danger-bg: #3f1515;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  main { max-width: 940px; margin: 0 auto; padding: 40px 16px 80px; }
   h1 { font-size: 30px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 32px; }
-  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
-  h3 { font-size: 16px; margin: 24px 0 8px; }
-  p, li { max-width: 72ch; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14.5px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; }
-  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
-  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  h2 { font-size: 22px; margin: 52px 0 6px; padding-top: 20px; border-top: 1px solid var(--line); }
+  h2 .q { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p, li { max-width: 74ch; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; margin: 10px 0; }
   pre code { background: none; padding: 0; }
-  .callout { background: var(--accent-bg); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .answer { background: var(--accent-bg); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 12px 0 20px; }
+  .answer strong { display: block; margin-bottom: 2px; }
   .decision { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
   .decision strong { color: var(--warn); }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
-  .card h4 { margin: 0 0 6px; font-size: 15px; }
-  .card p { margin: 0; font-size: 14px; color: var(--muted); }
-  .mock { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 12px 0 20px; font-size: 14px; }
-  .mock .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .mock .head b { font-size: 15px; }
-  .mock .btn { border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 3px 10px; font-size: 13px; }
-  .mock .row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
-  .mock .row.th { color: var(--muted); font-size: 12.5px; border-top: none; }
-  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--accent-bg); color: var(--accent); }
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin: 8px 0 18px; }
+
+  /* question cards */
+  .qgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0 8px; }
+  .qgrid a { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit; }
+  .qgrid a:hover { border-color: var(--accent); }
+  .qgrid a b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .qgrid a span { font-size: 13.5px; color: var(--muted); }
+  .qgrid a em { display: block; font-style: normal; font-size: 12.5px; color: var(--accent); margin-top: 8px; font-weight: 600; }
+
+  /* schema toggle */
+  .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; font-size: 13.5px; margin: 6px 0 14px; }
+  .toggle button { border: 0; background: var(--panel); color: var(--muted); padding: 6px 16px; cursor: pointer; font: inherit; }
+  .toggle button.on { background: var(--accent); color: #fff; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin: 6px 0 14px; }
   .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-  .legend .l-keep::before { background: var(--panel); border: 1px solid var(--line); }
-  .legend .l-new::before { background: var(--new-bg); border: 1px solid var(--new); }
-  .legend .l-derived::before { background: var(--derived-bg); border: 1px solid var(--derived); }
-  .schema { margin: 18px 0 26px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .l-keep::before { background: var(--panel); border: 1px solid var(--line); }
+  .l-new::before { background: var(--new-bg); border: 1px solid var(--new); }
+  .l-derived::before { background: var(--derived-bg); border: 1px solid var(--derived); }
+  .svc { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  .schema { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .schema.is-new { border-color: var(--new); }
-  .schema .name { padding: 9px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 600; background: var(--panel); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .schema .name { padding: 8px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; font-weight: 600; background: var(--panel); display: flex; justify-content: space-between; gap: 10px; }
   .schema.is-new .name { background: var(--new-bg); color: var(--new); }
-  .schema .name small { font-weight: 500; color: var(--muted); font-family: inherit; font-size: 12px; }
+  .schema .name small { font-weight: 500; color: var(--muted); font-size: 12px; }
   .schema.is-new .name small { color: var(--new); }
-  .schema table { margin: 0; font-size: 13.5px; }
-  .schema td, .schema th { padding: 6px 14px; }
-  .schema tr:last-child td { border-bottom: none; }
+  .schema table { margin: 0; font-size: 13px; }
+  .schema td { padding: 5px 14px; }
   .schema td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  .schema tr:last-child td { border-bottom: none; }
   .schema tr.new td { background: var(--new-bg); }
   .schema tr.new td:first-child { color: var(--new); font-weight: 600; }
   .schema tr.derived td { background: var(--derived-bg); }
   .schema tr.derived td:first-child { color: var(--derived); font-weight: 600; }
   .schema tr.muted td { color: var(--muted); }
-  .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+  .schema .foot { padding: 7px 14px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); }
+  .schema.is-new .foot { background: var(--new-bg); }
+  .svc h4 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .svc .count { font-size: 13px; color: var(--muted); margin: 6px 0 10px; }
+  [data-view="before"] .after-only { display: none; }
+  [data-view="after"] .before-only { display: none; }
+  .tag { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
   .tag.new { background: var(--new); color: #fff; }
   .tag.derived { background: var(--derived); color: #fff; }
-  .schema .foot { padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); }
-  .schema.is-new .foot { background: var(--new-bg); }
-  svg text { font-family: inherit; }
+
+  /* sandbox */
+  .sandbox { border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 14px 0 20px; background: var(--panel); }
+  .sandbox .hint { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .col h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+  .col.tasks h4 { color: var(--task); } .col.threads h4 { color: var(--thread); }
+  .chip { display: block; width: 100%; text-align: left; border: 2px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; cursor: pointer; font: inherit; font-size: 14px; }
+  .chip small { display: block; color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .chip.sel { border-color: var(--task); background: var(--task-bg); }
+  .col.threads .chip.sel { border-color: var(--thread); background: var(--thread-bg); }
+  .chip.linked { border-style: dashed; border-color: var(--new); }
+  .chip .n { float: right; font-size: 12px; color: var(--muted); }
+  .sandbox table { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 14px 0 6px; font-size: 13px; }
+  .sandbox td, .sandbox th { padding: 6px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .sandbox tr.flash td { background: var(--new-bg); }
+  .sandbox .empty td { color: var(--muted); font-family: inherit; text-align: center; }
+  .sandbox .out { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  .sandbox .out div { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .sandbox .out b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .sandbox .out code { display: block; white-space: pre-wrap; margin-bottom: 6px; }
+  .sandbox .status { font-size: 13px; min-height: 20px; margin-top: 6px; color: var(--accent); }
+  .sandbox .reset { float: right; font-size: 12.5px; color: var(--accent); background: none; border: 0; cursor: pointer; font-family: inherit; }
+  @media (max-width: 640px) { .cols, .sandbox .out { grid-template-columns: 1fr; } }
+
+  /* flows */
+  .flows { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
+  .flows button { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13.5px; }
+  .flows button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .flow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  .steps li { position: relative; padding: 9px 12px 9px 42px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; font-size: 14px; cursor: pointer; background: var(--bg); }
+  .steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 12px; top: 9px; width: 22px; height: 22px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); font-size: 12px; text-align: center; line-height: 20px; color: var(--muted); }
+  .steps li.on { border-color: var(--accent); background: var(--accent-bg); }
+  .steps li.on::before { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .steps li small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .boxes { display: grid; gap: 10px; }
+  .box { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; background: var(--bg); opacity: .55; transition: opacity .15s; }
+  .box b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; margin-bottom: 2px; }
+  .box.hit { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .box.hit.write { border-color: var(--new); box-shadow: 0 0 0 3px var(--new-bg); }
+  .box.hit.read { border-color: var(--derived); box-shadow: 0 0 0 3px var(--derived-bg); }
+  .box.hit.fail { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-bg); }
+  .box .op { float: right; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .box.write .op { color: var(--new); } .box.read .op { color: var(--derived); } .box.fail .op { color: var(--danger); }
+  .flowctl { margin-top: 8px; font-size: 13px; }
+  .flowctl button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  @media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+
+  /* sync compare */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .compare > div { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .compare h4 { margin: 0 0 8px; font-size: 15px; }
+  .compare .pick { border-color: var(--new); background: var(--new-bg); }
+  .compare .pick h4 { color: var(--new); }
+  .compare ul { padding-left: 18px; margin: 6px 0; font-size: 14px; }
+  @media (max-width: 640px) { .compare { grid-template-columns: 1fr; } }
+  .stores { width: 100%; }
+  .stores td:first-child { white-space: nowrap; font-weight: 600; }
+  .stores .s-task { color: var(--task); } .stores .s-thread { color: var(--thread); } .stores .s-live { color: var(--derived); }
+
+  .mock { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0 18px; font-size: 13.5px; }
+  .mock .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .mock .btn { border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 2px 10px; font-size: 12.5px; }
+  .mock .row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .mock .row.th { color: var(--muted); font-size: 12px; border-top: none; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--accent-bg); color: var(--accent); }
   @media (max-width: 600px) { .mock .row { grid-template-columns: 1fr 1fr; } }
+  details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; font-size: 15px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Task ↔ Email Links</h1>
-  <p class="sub">Design proposal · taskservice, notificationservicev2, task frontend, email frontend · 2026-10-15</p>
+  <p class="sub">Design proposal · taskservice, notificationservicev2, task frontend, email frontend · 2026-10-16</p>
 
-  <div class="callout">
-    <strong>Recommendation in one line.</strong> Link tasks to email <em>threads</em>, store the link in <strong>taskservice</strong> as a generic
-    <code>task_links</code> row, and let both the email detail view and the task view read from taskservice. Notificationservicev2 only gains two
-    aggregate fields on the thread.
+  <div class="answer">
+    <strong>In one line</strong>
+    Add <em>one</em> new table in taskservice, <code>task_links</code>, that stores pairs of (task, email thread). No column changes anywhere else, no data copied between services, and nothing to keep in sync.
   </div>
 
-  <h2>1. Where things stand</h2>
-  <div class="cards">
-    <div class="card"><h4>Tasks</h4><p>One single-valued entity link (<code>entityType</code>, <code>entityCode</code>, <code>entityNumber</code>) on the task row, validated at write time by calling the owning service. List is filterable by entity type and code.</p></div>
-    <div class="card"><h4>Email threads</h4><p>A thread groups an outbound email with its replies and bounces. It also carries one entity link. The thread detail page in the email frontend is the "email details view".</p></div>
-    <div class="card"><h4>Between them</h4><p>Nothing. Taskservice has no gRPC client for notificationservice, and notificationservice has none for taskservice.</p></div>
+  <div class="qgrid">
+    <a href="#q1"><b>Are we adding new columns?</b><span>Which service, which table, and why there.</span><em>One table in taskservice, zero columns elsewhere →</em></a>
+    <a href="#q2"><b>Can it handle many-to-many?</b><span>One task on several emails, one email on several tasks.</span><em>Yes, try the sandbox →</em></a>
+    <a href="#q3"><b>How and when are rows written?</b><span>Step through each flow and watch which table it touches.</span><em>Four flows →</em></a>
+    <a href="#q4"><b>Do we need to sync between services?</b><span>Who owns what, and what happens on failure.</span><em>No. Here is why →</em></a>
   </div>
 
-  <h2>2. Decisions</h2>
-
-  <div class="decision"><strong>Granularity: thread, not message.</strong>
-    A task relates to a conversation, not to one reply. Message-level links multiply rows without adding meaning, and a message always resolves to its thread.
-    A nullable <code>message_code</code> can be added later if a specific message ever needs pinning.</div>
-
-  <div class="decision"><strong>Owner: taskservice.</strong>
-    The link is an attribute of the task, exactly like the entity link. One write path, one permission model, and the task list can be filtered by thread code with a plain join.
-    Storing it in notificationservicev2 would force that service to validate task codes and would split "what is this task about" across two databases.</div>
-
-  <div class="decision"><strong>Shape: generic link table, scoped to <code>EmailThread</code> for now.</strong>
-    Mirrors the existing <code>EntityRef {type, code}</code>. Documents or comments can be linked later without a new table or new endpoints.
-    The alternative, a dedicated <code>task_email_threads</code> table, costs the same today and one more table next time.</div>
-
-  <h2>3. Database tables</h2>
-  <p>Every table the feature touches, column by column. Only one table is created; the existing ones keep their shape.</p>
-  <div class="legend">
-    <span class="l-keep">Existing, unchanged</span>
-    <span class="l-new">Added by this feature</span>
-    <span class="l-derived">Derived at query time, not stored</span>
+  <!-- ───────────────────────── Q1 ───────────────────────── -->
+  <h2 id="q1"><span class="q">Question 1</span>Are we adding new columns?</h2>
+  <div class="answer">
+    <strong>Yes, but only as one new table in taskservice.</strong>
+    <code>task_links</code> gets eight columns. The <code>tasks</code> table, <code>email_threads</code> and <code>email_messages</code> keep their shape. Notificationservicev2 gets two <em>computed</em> fields on its API that are not stored.
   </div>
 
-  <div class="schema is-new">
-    <div class="name">taskservice · task_links <small>new table</small></div>
+  <p>Flip between the current schema and the proposed one. Green is new, purple is computed at query time.</p>
+  <div class="toggle" role="tablist">
+    <button class="on" data-view="before">Before</button>
+    <button data-view="after">After</button>
+  </div>
+  <div class="legend"><span class="l-keep">Existing, unchanged</span><span class="l-new">Added</span><span class="l-derived">Derived on read, not stored</span></div>
+
+  <div class="svc" id="schemas" data-view="before">
+    <div>
+      <h4>taskservice</h4>
+      <div class="count before-only">2 tables involved · 0 changes</div>
+      <div class="count after-only">3 tables involved · <b style="color:var(--new)">+1 table</b>, 0 column changes</div>
+
+      <div class="schema is-new after-only">
+        <div class="name">task_links <small>new</small></div>
+        <table>
+          <tr class="new"><td>id</td><td>serial PK</td></tr>
+          <tr class="new"><td>task_id</td><td>int · FK tasks.id · ON DELETE CASCADE</td></tr>
+          <tr class="new"><td>link_type</td><td>varchar · <code>EmailThread</code></td></tr>
+          <tr class="new"><td>link_code</td><td>varchar · <code>thr_…</code></td></tr>
+          <tr class="new"><td>owner</td><td>varchar · RLS, same default as tasks</td></tr>
+          <tr class="new"><td>tenant_hierarchy</td><td>varchar · RLS</td></tr>
+          <tr class="new"><td>created_by</td><td>varchar</td></tr>
+          <tr class="new"><td>created_at</td><td>timestamptz</td></tr>
+        </table>
+        <div class="foot">UNIQUE (task_id, link_type, link_code) · INDEX (link_type, link_code)</div>
+      </div>
+
+      <div class="schema" style="margin-top:12px">
+        <div class="name">tasks <small>unchanged</small></div>
+        <table>
+          <tr><td>id, code</td><td>serial, varchar</td></tr>
+          <tr><td>subject, description</td><td>varchar</td></tr>
+          <tr><td>assignee, reporter, priority</td><td>varchar</td></tr>
+          <tr><td>status_id, due_date</td><td>int, timestamptz</td></tr>
+          <tr><td>entity_type, entity_code, entity_number</td><td>varchar · existing single entity link</td></tr>
+          <tr><td>user_group_code, version</td><td>varchar, int</td></tr>
+          <tr class="muted"><td>owner, tenant_hierarchy, audit cols</td><td></td></tr>
+          <tr class="derived after-only"><td>links <span class="tag derived">api</span></td><td>TaskLink[] · joined from task_links on read</td></tr>
+        </table>
+      </div>
+
+      <div class="schema" style="margin-top:12px">
+        <div class="name">tasks_history <small>unchanged</small></div>
+        <table><tr class="muted"><td>mirror of tasks</td><td>trigger-filled; link rows bypass it, changelog covers them</td></tr></table>
+      </div>
+    </div>
+
+    <div>
+      <h4>notificationservicev2</h4>
+      <div class="count before-only">2 tables involved · 0 changes</div>
+      <div class="count after-only">2 tables involved · 0 changes · <b style="color:var(--derived)">+2 computed API fields</b></div>
+
+      <div class="schema">
+        <div class="name">email_threads <small>unchanged</small></div>
+        <table>
+          <tr><td>id, code</td><td>serial, varchar</td></tr>
+          <tr><td>entity_type, entity_code, entity_number</td><td>varchar · the thread's own entity link</td></tr>
+          <tr><td>subject, status</td><td>varchar · open / closed</td></tr>
+          <tr><td>mailbox, conversation_id</td><td>varchar · Graph only</td></tr>
+          <tr class="muted"><td>owner, tenant_hierarchy, audit cols</td><td></td></tr>
+          <tr class="derived after-only"><td>message_count <span class="tag derived">api</span></td><td>count(email_messages) where thread_code = code</td></tr>
+          <tr class="derived after-only"><td>last_message_at <span class="tag derived">api</span></td><td>max(coalesce(received_at, sent_at))</td></tr>
+        </table>
+        <div class="foot after-only">Subquery on the thread list and get queries. No migration.</div>
+      </div>
+
+      <div class="schema" style="margin-top:12px">
+        <div class="name">email_messages <small>unchanged</small></div>
+        <table><tr class="muted"><td>thread_code</td><td>varchar · only read for the two aggregates</td></tr></table>
+      </div>
+    </div>
+  </div>
+
+  <h3>Why taskservice, and why a separate table?</h3>
+  <table>
+    <tr><th>Option</th><th>What it means</th><th>Verdict</th></tr>
+    <tr><td><b>New table in taskservice</b></td><td>Link is an attribute of the task, like the existing entity link. One write path, one permission model, task list filters by thread with a join.</td><td style="color:var(--new);font-weight:600">Chosen</td></tr>
+    <tr><td>Column on <code>tasks</code></td><td><code>email_thread_code</code> on the task row.</td><td>No. A column holds one value, so a task could never relate to two emails.</td></tr>
+    <tr><td>Column on <code>email_threads</code></td><td><code>task_code</code> on the thread row.</td><td>No. Same one-value problem, and notificationservice would have to validate task codes.</td></tr>
+    <tr><td>Table in notificationservicev2</td><td><code>email_thread_tasks</code> next to the threads.</td><td>No. Splits "what is this task about" across two databases, and the task list could not filter by thread without a cross-service call.</td></tr>
+    <tr><td>Columns in both</td><td>Each side stores the other's code.</td><td>No. Two writes per link, two places to drift, see <a href="#q4">question 4</a>.</td></tr>
+  </table>
+
+  <div class="decision"><strong>Why <code>link_type</code> + <code>link_code</code> instead of <code>email_thread_code</code>?</strong>
+    It mirrors the platform's <code>EntityRef {type, code}</code>. The next thing that hangs off a task, say a document or a comment thread, reuses the same table and endpoints. Cost today is identical.</div>
+
+  <!-- ───────────────────────── Q2 ───────────────────────── -->
+  <h2 id="q2"><span class="q">Question 2</span>Can it handle many-to-many?</h2>
+  <div class="answer">
+    <strong>Yes. A join table is exactly the many-to-many shape.</strong>
+    Each row is one (task, thread) pair. A task appears in as many rows as it has emails, a thread in as many rows as it has tasks. The unique constraint only stops the <em>same</em> pair twice.
+  </div>
+
+  <div class="sandbox" id="sandbox">
+    <button class="reset" type="button">Reset</button>
+    <p class="hint">Click a task, then a thread, to link them. Select the same pair again to unlink. The table below is the real <code>task_links</code> content, and the two panels show what each view would ask for the last task and thread you touched.</p>
+    <div class="cols">
+      <div class="col tasks"><h4>Tasks (taskservice)</h4><div id="sb-tasks"></div></div>
+      <div class="col threads"><h4>Email threads (notificationservicev2)</h4><div id="sb-threads"></div></div>
+    </div>
+    <div class="status" id="sb-status">Pick a task.</div>
     <table>
-      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-      <tr class="new"><td>id</td><td>serial PK</td><td></td></tr>
-      <tr class="new"><td>task_id</td><td>integer</td><td>FK → tasks.id, <code>ON DELETE CASCADE</code></td></tr>
-      <tr class="new"><td>link_type</td><td>varchar</td><td>only <code>EmailThread</code> for now; enum lives in code, not in the DB</td></tr>
-      <tr class="new"><td>link_code</td><td>varchar</td><td>thread code, e.g. <code>thr_a1b2c3d4e5</code></td></tr>
-      <tr class="new"><td>owner</td><td>varchar</td><td>default <code>split_part(current_user, ':', 1)</code>, same as tasks</td></tr>
-      <tr class="new"><td>tenant_hierarchy</td><td>varchar</td><td>default <code>current_user</code></td></tr>
-      <tr class="new"><td>created_by</td><td>varchar</td><td>who linked it</td></tr>
-      <tr class="new"><td>created_at</td><td>timestamptz</td><td></td></tr>
+      <thead><tr><th>task_links.task_id</th><th>link_type</th><th>link_code</th></tr></thead>
+      <tbody id="sb-rows"><tr class="empty"><td colspan="3">no rows yet</td></tr></tbody>
     </table>
-    <div class="foot">Unique <code>(task_id, link_type, link_code)</code> · Index <code>idx_task_links_type_code (link_type, link_code)</code> for "tasks for this thread" · RLS policy copied from tasks</div>
+    <div class="out">
+      <div><b>Task view asks</b><code id="sb-q-task">GET /tasks/:code → links: []</code><span id="sb-a-task"></span></div>
+      <div><b>Email view asks</b><code id="sb-q-thread">GET /tasks?filters=links.code==…</code><span id="sb-a-thread"></span></div>
+    </div>
   </div>
 
-  <div class="schema">
-    <div class="name">taskservice · tasks <small>no column changes</small></div>
-    <table>
-      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-      <tr><td>id, code</td><td>serial, varchar</td><td><code>task_…</code></td></tr>
-      <tr><td>subject, description</td><td>varchar</td><td></td></tr>
-      <tr><td>assignee, reporter, priority</td><td>varchar</td><td></td></tr>
-      <tr><td>status_id</td><td>integer</td><td>FK → statuses</td></tr>
-      <tr><td>due_date</td><td>timestamptz</td><td></td></tr>
-      <tr><td>entity_type, entity_code, entity_number</td><td>varchar</td><td>the existing single-valued entity link, untouched</td></tr>
-      <tr><td>user_group_code</td><td>varchar</td><td></td></tr>
-      <tr><td>version</td><td>integer</td><td>optimistic locking; bumped on link / unlink so clients refetch</td></tr>
-      <tr><td>owner, tenant_hierarchy, created_by, updated_by, created_at, updated_at, deleted_at</td><td></td><td></td></tr>
-      <tr class="derived"><td>links <span class="tag derived">API</span></td><td>TaskLink[]</td><td>joined from <code>task_links</code> on read; always returned on <code>Task</code>, filterable via <code>links.type</code>, <code>links.code</code></td></tr>
-    </table>
+  <p>Try linking <em>Request documents</em> to both threads, then <em>Claim CLM-0042 documents</em> to a second task. Both directions work without touching any other table.</p>
+
+  <!-- ───────────────────────── Q3 ───────────────────────── -->
+  <h2 id="q3"><span class="q">Question 3</span>How and when are rows written?</h2>
+  <div class="answer">
+    <strong>Only by explicit user actions through taskservice, never by background jobs.</strong>
+    Nothing is backfilled. Existing tasks and threads start with zero links. Rows appear when someone links, and disappear when someone unlinks or the task is deleted.
   </div>
 
-  <div class="schema">
-    <div class="name">taskservice · tasks_history <small>no column changes</small></div>
-    <table>
-      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-      <tr class="muted"><td>(mirror of tasks)</td><td></td><td>filled by trigger on <code>tasks</code></td></tr>
-    </table>
-    <div class="foot">Link rows never pass through this trigger. Link and unlink are instead recorded through the changelog producer as task updates, so the audit trail stays complete without a second history table.</div>
+  <p>Pick a flow and step through it. Boxes light up as the step reads or writes them.</p>
+  <div class="flows" id="flow-tabs"></div>
+  <div class="flow">
+    <ol class="steps" id="flow-steps"></ol>
+    <div class="boxes" id="flow-boxes">
+      <div class="box" data-box="fe"><b>frontend</b>task page or email thread page</div>
+      <div class="box" data-box="ts-api"><b>taskservice · API</b>validation, permissions, changelog</div>
+      <div class="box" data-box="ts-links"><b>taskservice · task_links</b>the only table that changes</div>
+      <div class="box" data-box="ts-tasks"><b>taskservice · tasks</b>version bump, entity link</div>
+      <div class="box" data-box="ns-api"><b>notificationservicev2 · gRPC</b>GetEmailThread / ListEmailThreads</div>
+      <div class="box" data-box="ns-threads"><b>notificationservicev2 · email_threads</b>read only</div>
+      <div class="box" data-box="kafka"><b>changelog</b>task updated event</div>
+    </div>
   </div>
+  <div class="flowctl"><button type="button" id="flow-prev">← Prev</button> <button type="button" id="flow-next">Next →</button> <span id="flow-pos"></span></div>
 
-  <div class="schema">
-    <div class="name">notificationservicev2 · email_threads <small>no column changes, two derived fields</small></div>
-    <table>
-      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-      <tr><td>id, code</td><td>serial, varchar</td><td><code>thr_…</code></td></tr>
-      <tr><td>entity_type, entity_code, entity_number</td><td>varchar</td><td>the thread's own entity link, independent of the task's</td></tr>
-      <tr><td>subject, status</td><td>varchar</td><td><code>open</code> / <code>closed</code></td></tr>
-      <tr><td>mailbox, conversation_id</td><td>varchar</td><td>Graph only</td></tr>
-      <tr><td>owner, tenant_hierarchy, created_by, updated_by, created_at, updated_at, deleted_at</td><td></td><td></td></tr>
-      <tr class="derived"><td>message_count <span class="tag derived">API</span></td><td>integer</td><td><code>count(email_messages.id) where thread_code = code and kind = 'message'</code></td></tr>
-      <tr class="derived"><td>last_message_at <span class="tag derived">API</span></td><td>timestamptz</td><td><code>max(coalesce(received_at, sent_at))</code> over the same rows</td></tr>
-    </table>
-    <div class="foot">Both aggregates are a subquery on the thread list and get queries. No migration in notificationservicev2.</div>
-  </div>
-
-  <div class="schema">
-    <div class="name">notificationservicev2 · email_messages <small>untouched</small></div>
-    <table>
-      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-      <tr class="muted"><td>thread_code</td><td>varchar</td><td>FK → email_threads.code; only used for the aggregates above</td></tr>
-    </table>
-  </div>
-
-  <h3>Migration (taskservice)</h3>
+  <h3>Rollout: when the schema change lands</h3>
+  <ol>
+    <li><strong>Protorepo</strong> first: <code>TaskLink</code>, the two rpcs, the two computed thread fields. PR pipelines compile against protorepo master, so this merges before anything else.</li>
+    <li><strong>Taskservice</strong>: migration creates <code>task_links</code> (additive, no downtime, no backfill), then entity, notificationservice gRPC client, endpoints, list filter, changelog, e2e specs.</li>
+    <li><strong>Notificationservicev2</strong>: aggregates on the thread query. Independent of step 2, can ship in either order.</li>
+    <li><strong>Frontends</strong>: tasks panel on the thread page, emails section on the task page. Needs 2 and 3 deployed.</li>
+  </ol>
 <pre><code>CREATE TABLE task_links (
   id               serial PRIMARY KEY,
   task_id          integer NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -197,137 +339,262 @@
   CONSTRAINT uq_task_links UNIQUE (task_id, link_type, link_code)
 );
 CREATE INDEX idx_task_links_type_code ON task_links (link_type, link_code);</code></pre>
-  <p>Taskservice stores <strong>only the code</strong>. Subject, status and activity of the thread are fetched live, so nothing goes stale.</p>
 
-  <h2>4. API changes</h2>
+  <!-- ───────────────────────── Q4 ───────────────────────── -->
+  <h2 id="q4"><span class="q">Question 4</span>Do we need to sync between services?</h2>
+  <div class="answer">
+    <strong>No. Each fact has exactly one home, and the other side reads it live.</strong>
+    Taskservice stores only the thread <em>code</em>. Everything a user sees about the thread (subject, status, last message) is fetched from notificationservicev2 at render time. Nothing is duplicated, so nothing can drift.
+  </div>
 
-  <h3>Protorepo · taskservice/v1</h3>
-<pre><code>message TaskLink {
-  string type = 1;   // "EmailThread"
-  string code = 2;
-}
+  <table class="stores">
+    <tr><th>Fact</th><th>Stored in</th><th>Read by</th></tr>
+    <tr><td class="s-task">Which threads a task is linked to</td><td>taskservice · task_links</td><td>Both views, through taskservice</td></tr>
+    <tr><td class="s-thread">Thread subject, status, entity</td><td>notificationservicev2 · email_threads</td><td>Task view, live via list with <code>code $in</code></td></tr>
+    <tr><td class="s-thread">Message count, last message time</td><td>Nowhere. Computed from email_messages on read</td><td>Task view, same call</td></tr>
+    <tr><td class="s-task">Task subject, status, assignee</td><td>taskservice · tasks</td><td>Email view, live via <code>filters=links.code==</code></td></tr>
+    <tr><td class="s-live">"Does this thread exist?"</td><td>Checked once, at link time, via gRPC</td><td>Taskservice, 404 if not</td></tr>
+  </table>
 
-message Task {
-  ...
-  repeated TaskLink links = 22;   // always returned, like category_slugs
-}
+  <div class="compare">
+    <div class="pick">
+      <h4>Chosen: store the code, read the rest live</h4>
+      <ul>
+        <li>One write per link, one place to delete.</li>
+        <li>Thread renamed or closed → task view shows it immediately.</li>
+        <li>No Kafka consumer, no reconcile job, no retry logic.</li>
+        <li>Cost: task view makes one extra list call to notificationservice per page load.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Rejected: copy thread fields into taskservice</h4>
+      <ul>
+        <li>Subject and status would need a Kafka consumer on thread updates.</li>
+        <li>Core Kafka consumers have no retry or DLQ, so a missed event means a stale row until a sweep fixes it.</li>
+        <li>Closing a thread would require a cross-service write.</li>
+        <li>Saves one read call per page. Not worth a sync pipeline.</li>
+      </ul>
+    </div>
+  </div>
 
-message CreateTaskRequest {
-  ...
-  repeated TaskLink links = 12;   // "create task from this email" in one call
-}
+  <h3>What happens when things go wrong</h3>
+  <table>
+    <tr><th>Case</th><th>Behaviour</th><th>Sync needed?</th></tr>
+    <tr><td>Thread deleted or not visible to the user</td><td>Task view renders the code marked "unavailable". Link stays until someone removes it.</td><td>No</td></tr>
+    <tr><td>Task deleted</td><td>Links cascade in the same transaction.</td><td>No</td></tr>
+    <tr><td>Thread reassigned to another entity</td><td>Task keeps its own entity link. The email link is additional, by design.</td><td>No</td></tr>
+    <tr><td>Same pair linked twice</td><td>Unique constraint. Endpoint is idempotent and returns the task.</td><td>No</td></tr>
+    <tr><td>Notificationservice down at link time</td><td>Link request fails with 503. Nothing half-written.</td><td>No</td></tr>
+    <tr><td>Notificationservice down at read time</td><td>Task page shows links as codes only, with a retry hint.</td><td>No</td></tr>
+    <tr><td>Thread from another tenant</td><td>Validation runs with the caller's headers, so the lookup is tenant-scoped and 404s.</td><td>No</td></tr>
+  </table>
 
-message AddTaskLinkRequest    { string code = 1; TaskLink link = 2; }
-message AddTaskLinkResponse   { Task task = 1; }
-message RemoveTaskLinkRequest { string code = 1; string link_type = 2; string link_code = 3; }
-message RemoveTaskLinkResponse{ Task task = 1; }
+  <!-- ───────────────────────── Reference ───────────────────────── -->
+  <h2><span class="q">Reference</span>API and UI changes</h2>
+
+  <details>
+    <summary>Proto changes</summary>
+<pre><code>// taskservice/v1
+message TaskLink { string type = 1; string code = 2; }
+
+message Task          { ... repeated TaskLink links = 22; }   // always returned
+message CreateTaskRequest { ... repeated TaskLink links = 12; }
+
+message AddTaskLinkRequest     { string code = 1; TaskLink link = 2; }
+message AddTaskLinkResponse    { Task task = 1; }
+message RemoveTaskLinkRequest  { string code = 1; string link_type = 2; string link_code = 3; }
+message RemoveTaskLinkResponse { Task task = 1; }
 
 service TaskService {
-  ...
   rpc AddTaskLink(AddTaskLinkRequest) returns (AddTaskLinkResponse) {}
   rpc RemoveTaskLink(RemoveTaskLinkRequest) returns (RemoveTaskLinkResponse) {}
-}</code></pre>
+}
 
-  <h3>Protorepo · notificationservice/v1</h3>
-<pre><code>message EmailThread {
-  ...
-  uint32 message_count = 10;
-  optional google.protobuf.Timestamp last_message_at = 11;
-}</code></pre>
-  <p>Cheap aggregates on the thread query. They let the task view show activity without loading messages and are useful on the thread list as well.</p>
+// notificationservice/v1
+message EmailThread { ... uint32 message_count = 10; optional google.protobuf.Timestamp last_message_at = 11; }</code></pre>
+  </details>
 
-  <h3>REST · taskservice</h3>
-  <table>
-    <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
-    <tr><td><code>POST</code></td><td><code>/tasks/:code/links</code></td><td>Body <code>{type, code}</code>. Validates the thread exists via notificationservice gRPC <code>GetEmailThread</code>. Returns the task.</td></tr>
-    <tr><td><code>DELETE</code></td><td><code>/tasks/:code/links/:type/:linkCode</code></td><td>Unlink. Returns the task.</td></tr>
-    <tr><td><code>GET</code></td><td><code>/tasks?filters=links.code==thr_x</code></td><td>Tasks for a thread. New filterable columns <code>links.type</code>, <code>links.code</code> in the paginate config.</td></tr>
-    <tr><td><code>POST</code></td><td><code>/tasks</code></td><td>Accepts <code>links[]</code> on create.</td></tr>
-  </table>
+  <details>
+    <summary>REST endpoints (taskservice)</summary>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+      <tr><td><code>POST</code></td><td><code>/tasks/:code/links</code></td><td>Body <code>{type, code}</code>. Validates the thread via gRPC. Idempotent.</td></tr>
+      <tr><td><code>DELETE</code></td><td><code>/tasks/:code/links/:type/:linkCode</code></td><td>Unlink.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/tasks?filters=links.code==thr_x</code></td><td>Tasks for a thread.</td></tr>
+      <tr><td><code>POST</code></td><td><code>/tasks</code></td><td>Accepts <code>links[]</code>, so "create task from email" is one call.</td></tr>
+    </table>
+    <p>Notificationservicev2 adds no endpoints. The email frontend calls taskservice directly, as the entity task widget already does.</p>
+  </details>
 
-  <h3>REST · notificationservicev2</h3>
-  <p>No new endpoints. The email frontend calls taskservice directly, as the entity task widget already does for claims and policies. Avoids a notificationservice → taskservice dependency.</p>
+  <details>
+    <summary>UI panels</summary>
+    <h3>Email thread detail → Tasks</h3>
+    <div class="mock">
+      <div class="head"><b>Tasks (3)</b><span class="btn">+ Create task from this email</span></div>
+      <div class="row th"><span>Subject</span><span>Status</span><span>Priority</span><span>Assignee</span><span>Due</span></div>
+      <div class="row"><span>Request missing documents</span><span><span class="pill">In progress</span></span><span>High</span><span>A. Müller</span><span>2026-10-20</span></div>
+      <div class="row"><span>Confirm coverage question</span><span><span class="pill">To do</span></span><span>Medium</span><span>—</span><span>—</span></div>
+      <div class="row"><span>Follow up on bounce</span><span><span class="pill">Done</span></span><span>Low</span><span>J. Smith</span><span>2026-10-10</span></div>
+    </div>
+    <p>Reuses the entity task list widget pinned to the thread code. Create prefills the link and copies the thread's entity ref into the task's entity link.</p>
+    <h3>Task detail → Emails</h3>
+    <div class="mock">
+      <div class="head"><b>Emails (2)</b><span class="btn">+ Link email</span></div>
+      <div class="row th"><span>Subject</span><span>Entity</span><span>Status</span><span>Last message</span><span>Messages</span></div>
+      <div class="row"><span>Re: Claim CLM-2026-0042 documents</span><span>CLM-2026-0042</span><span><span class="pill">open</span></span><span>2 h ago</span><span>5</span></div>
+      <div class="row"><span>Your policy POL-2024-000123</span><span>POL-2024-000123</span><span><span class="pill">closed</span></span><span>3 d ago</span><span>2</span></div>
+    </div>
+  </details>
 
-  <h3>Validation and audit</h3>
-  <ul>
-    <li>Taskservice gets a notificationservice gRPC client config and a resolver for <code>EmailThread</code>, following the existing <code>LinkedEntityResolverService</code> pattern. Unknown thread → 404.</li>
-    <li>Linking requires the task update permission. Viewing linked threads requires the email view permission, which the user already needs to open the thread page.</li>
-    <li><code>tasks_history</code> is trigger-based on the tasks table and will not see link rows. The changelog producer should emit link and unlink as task updates so the audit trail stays complete.</li>
-  </ul>
-
-  <h2>5. Request flow</h2>
-  <svg viewBox="0 0 860 300" width="100%" role="img" aria-label="Request flow between frontends and services">
-    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
-    <g fill="var(--panel)" stroke="var(--line)">
-      <rect x="20" y="30" width="200" height="60" rx="8"/>
-      <rect x="20" y="210" width="200" height="60" rx="8"/>
-      <rect x="330" y="120" width="200" height="60" rx="8"/>
-      <rect x="640" y="120" width="200" height="60" rx="8"/>
-    </g>
-    <g fill="var(--fg)" font-size="14" text-anchor="middle">
-      <text x="120" y="55">Email frontend</text><text x="120" y="75" fill="var(--muted)" font-size="12">thread detail</text>
-      <text x="120" y="235">Task frontend</text><text x="120" y="255" fill="var(--muted)" font-size="12">task detail / edit</text>
-      <text x="430" y="145">taskservice</text><text x="430" y="165" fill="var(--muted)" font-size="12">task_links</text>
-      <text x="740" y="145">notificationservice</text><text x="740" y="165" fill="var(--muted)" font-size="12">email_threads</text>
-    </g>
-    <g stroke="var(--fg)" stroke-width="1.5" fill="none" marker-end="url(#arr)" color="var(--fg)">
-      <path d="M220 60 L330 135"/>
-      <path d="M220 240 L330 165"/>
-      <path d="M530 150 L640 150"/>
-      <path d="M120 90 C120 150 160 110 230 100 C300 90 560 60 740 118"/>
-      <path d="M120 210 C120 180 200 220 300 220 C420 220 600 240 740 182"/>
-    </g>
-    <g fill="var(--muted)" font-size="12">
-      <text x="225" y="85">GET /tasks?filters=links.code==thr_x</text>
-      <text x="225" y="225">POST /tasks/:code/links</text>
-      <text x="540" y="140">GetEmailThread (validate)</text>
-      <text x="420" y="50">GET /email-threads/:code, messages</text>
-      <text x="400" y="262">GET /email-threads?filters=code$in:…  (subject, status, activity)</text>
-    </g>
-  </svg>
-
-  <h2>6. UI</h2>
-
-  <h3>Email thread detail → "Tasks" panel</h3>
-  <p>Reuses the existing entity task list widget, pinned to the thread code instead of an entity. The create button prefills the thread link and copies the thread's entity ref into the task's entity link, so a task created from a claim email also lands on that claim.</p>
-  <div class="mock">
-    <div class="head"><b>Tasks (3)</b><span class="btn">+ Create task from this email</span></div>
-    <div class="row th"><span>Subject</span><span>Status</span><span>Priority</span><span>Assignee</span><span>Due</span></div>
-    <div class="row"><span>Request missing documents</span><span><span class="pill">In progress</span></span><span>High</span><span>A. Müller</span><span>2026-10-20</span></div>
-    <div class="row"><span>Confirm coverage question</span><span><span class="pill">To do</span></span><span>Medium</span><span>—</span><span>—</span></div>
-    <div class="row"><span>Follow up on bounce</span><span><span class="pill">Done</span></span><span>Low</span><span>J. Smith</span><span>2026-10-10</span></div>
-  </div>
-
-  <h3>Task detail / edit → "Emails" section</h3>
-  <p>Lists linked threads with subject, entity number, thread status, last message date and message count. Each row links to the thread page. "Link email" opens a thread search backed by the notificationservice list endpoint. Unlink calls the delete endpoint.</p>
-  <div class="mock">
-    <div class="head"><b>Emails (2)</b><span class="btn">+ Link email</span></div>
-    <div class="row th"><span>Subject</span><span>Entity</span><span>Status</span><span>Last message</span><span>Messages</span></div>
-    <div class="row"><span>Re: Claim CLM-2026-0042 documents</span><span>CLM-2026-0042</span><span><span class="pill">open</span></span><span>2 h ago</span><span>5</span></div>
-    <div class="row"><span>Your policy POL-2024-000123</span><span>POL-2024-000123</span><span><span class="pill">closed</span></span><span>3 d ago</span><span>2</span></div>
-  </div>
-  <p>Threads are fetched in one call with a <code>code $in</code> filter. A code that does not come back is rendered as "unavailable" rather than failing the task load.</p>
-
-  <h2>7. Edge cases</h2>
-  <table>
-    <tr><th>Case</th><th>Behaviour</th></tr>
-    <tr><td>Thread deleted or not visible</td><td>Task view shows the code marked unavailable. Link stays until someone removes it.</td></tr>
-    <tr><td>Task deleted</td><td>Links cascade.</td></tr>
-    <tr><td>Thread reassigned to another entity</td><td>The task's own entity link is independent and stays as is. Deliberate: the email link is additional to the entity link.</td></tr>
-    <tr><td>Same thread linked twice</td><td>Unique constraint → 409 or idempotent no-op. Recommend idempotent.</td></tr>
-    <tr><td>Thread from another tenant</td><td>Taskservice validates with the caller's headers, so the lookup is tenant-scoped and returns 404.</td></tr>
-  </table>
-
-  <h2>8. Rollout order</h2>
-  <ol>
-    <li><strong>Protorepo</strong>: <code>TaskLink</code>, new rpcs, thread aggregate fields. Merge first, PR pipelines compile against master.</li>
-    <li><strong>Taskservice</strong>: migration, entity, notificationservice client + resolver, endpoints, list filter, changelog, e2e specs.</li>
-    <li><strong>Notificationservicev2</strong>: <code>message_count</code> and <code>last_message_at</code> on the thread.</li>
-    <li><strong>Frontends</strong>: tasks panel on the thread page, emails section on the task page.</li>
-  </ol>
-
-  <h2>9. Open question for the team</h2>
-  <p>Generic <code>task_links</code> versus a dedicated <code>task_email_threads</code> table. The recommendation is generic: identical cost now, and it spares a second table and a second set of endpoints the next time something needs to hang off a task.</p>
+  <details>
+    <summary>Open question for the team</summary>
+    <p>Generic <code>task_links</code> versus a dedicated <code>task_email_threads</code> table. Recommendation is generic: identical cost now, and it spares a second table and endpoints the next time something needs to hang off a task.</p>
+  </details>
 </main>
+
+<script>
+(function () {
+  // Q1 before/after toggle
+  var schemas = document.getElementById('schemas');
+  document.querySelectorAll('.toggle button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.toggle button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      schemas.setAttribute('data-view', b.dataset.view);
+    });
+  });
+
+  // Q2 sandbox
+  var TASKS = [
+    { id: 101, code: 'task_8Yk2p', subject: 'Request documents' },
+    { id: 102, code: 'task_Qm41z', subject: 'Confirm coverage' },
+    { id: 103, code: 'task_Lw9xA', subject: 'Follow up on bounce' }
+  ];
+  var THREADS = [
+    { code: 'thr_a1b2c3d4e5', subject: 'Claim CLM-0042 documents' },
+    { code: 'thr_f6g7h8i9j0', subject: 'Policy POL-000123 renewal' },
+    { code: 'thr_k1l2m3n4o5', subject: 'Bounce: invalid address' }
+  ];
+  var links = [], selTask = null, selThread = null, lastKey = null, viewTask = null, viewThread = null;
+  var elT = document.getElementById('sb-tasks'), elH = document.getElementById('sb-threads');
+  var elRows = document.getElementById('sb-rows'), elStatus = document.getElementById('sb-status');
+
+  function has(t, h) { return links.some(function (l) { return l.task === t.id && l.thread === h.code; }); }
+  function render() {
+    elT.innerHTML = TASKS.map(function (t) {
+      var n = links.filter(function (l) { return l.task === t.id; }).length;
+      var cls = 'chip' + (selTask === t.id ? ' sel' : '') + (selThread && has(t, THREADS.find(function (h) { return h.code === selThread; })) ? ' linked' : '');
+      return '<button type="button" class="' + cls + '" data-task="' + t.id + '"><span class="n">' + n + ' email' + (n === 1 ? '' : 's') + '</span>' + t.subject + '<small>' + t.code + ' · id ' + t.id + '</small></button>';
+    }).join('');
+    elH.innerHTML = THREADS.map(function (h) {
+      var n = links.filter(function (l) { return l.thread === h.code; }).length;
+      var cls = 'chip' + (selThread === h.code ? ' sel' : '') + (selTask && has(TASKS.find(function (t) { return t.id === selTask; }), h) ? ' linked' : '');
+      return '<button type="button" class="' + cls + '" data-thread="' + h.code + '"><span class="n">' + n + ' task' + (n === 1 ? '' : 's') + '</span>' + h.subject + '<small>' + h.code + '</small></button>';
+    }).join('');
+    elRows.innerHTML = links.length ? links.map(function (l) {
+      var k = l.task + '|' + l.thread;
+      return '<tr' + (k === lastKey ? ' class="flash"' : '') + '><td>' + l.task + '</td><td>EmailThread</td><td>' + l.thread + '</td></tr>';
+    }).join('') : '<tr class="empty"><td colspan="3">no rows yet</td></tr>';
+
+    var qt = document.getElementById('sb-q-task'), at = document.getElementById('sb-a-task');
+    if (viewTask) {
+      var t = TASKS.find(function (x) { return x.id === viewTask; });
+      var mine = links.filter(function (l) { return l.task === viewTask; }).map(function (l) { return l.thread; });
+      qt.textContent = 'GET /tasks/' + t.code + '\n→ links: [' + mine.map(function (c) { return '{EmailThread, ' + c + '}'; }).join(', ') + ']';
+      at.textContent = mine.length ? 'then GET /email-threads?filters=code$in:' + mine.join(',') + ' for subject, status, activity' : 'nothing to fetch from notificationservice';
+    } else { qt.textContent = 'GET /tasks/:code → links: []'; at.textContent = ''; }
+    var qh = document.getElementById('sb-q-thread'), ah = document.getElementById('sb-a-thread');
+    if (viewThread) {
+      var tasks = links.filter(function (l) { return l.thread === viewThread; }).map(function (l) { return TASKS.find(function (x) { return x.id === l.task; }).subject; });
+      qh.textContent = 'GET /tasks?filters=links.code==' + viewThread + '\n→ ' + tasks.length + ' task' + (tasks.length === 1 ? '' : 's');
+      ah.textContent = tasks.join(' · ') || 'none linked yet';
+    } else { qh.textContent = 'GET /tasks?filters=links.code==…'; ah.textContent = ''; }
+  }
+  function act() {
+    if (selTask && selThread) {
+      var t = TASKS.find(function (x) { return x.id === selTask; }), h = THREADS.find(function (x) { return x.code === selThread; });
+      if (has(t, h)) {
+        links = links.filter(function (l) { return !(l.task === t.id && l.thread === h.code); });
+        lastKey = null;
+        elStatus.textContent = 'DELETE /tasks/' + t.code + '/links/EmailThread/' + h.code + ' → row removed.';
+      } else {
+        links.push({ task: t.id, thread: h.code });
+        lastKey = t.id + '|' + h.code;
+        elStatus.textContent = 'POST /tasks/' + t.code + '/links {EmailThread, ' + h.code + '} → GetEmailThread ok → row inserted.';
+      }
+      selTask = selThread = null;
+    } else if (selTask) { elStatus.textContent = 'Now pick a thread.'; }
+    else if (selThread) { elStatus.textContent = 'Now pick a task.'; }
+    else { elStatus.textContent = 'Pick a task.'; }
+    render();
+  }
+  elT.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-task]'); if (!b) return;
+    var id = +b.dataset.task; viewTask = id; selTask = selTask === id ? null : id; act();
+  });
+  elH.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-thread]'); if (!b) return;
+    var c = b.dataset.thread; viewThread = c; selThread = selThread === c ? null : c; act();
+  });
+  document.querySelector('#sandbox .reset').addEventListener('click', function () { links = []; selTask = selThread = lastKey = viewTask = viewThread = null; elStatus.textContent = 'Pick a task.'; render(); });
+  render();
+
+  // Q3 flows
+  var FLOWS = [
+    { name: 'Create task from an email', steps: [
+      ['User clicks "Create task from this email" on the thread page', 'Form is prefilled with the thread link and the thread\'s entity ref', { fe: 'read' }],
+      ['POST /tasks with links: [{EmailThread, thr_…}]', 'One request, same as any task create', { fe: 'read', 'ts-api': 'read' }],
+      ['Taskservice validates the thread exists', 'gRPC GetEmailThread with the caller\'s headers, tenant-scoped, 404 if unknown', { 'ts-api': 'read', 'ns-api': 'read', 'ns-threads': 'read' }],
+      ['Insert task row and link row in one transaction', 'Entity link and email link are independent columns and rows', { 'ts-tasks': 'write', 'ts-links': 'write' }],
+      ['Emit changelog event', 'Task created, links included in the payload', { kafka: 'write' }],
+      ['Return the task with links populated', 'Frontend refreshes the Tasks panel', { fe: 'read' }]
+    ]},
+    { name: 'Link an existing task', steps: [
+      ['User picks a thread in the task page "Link email" search', 'Search is served by the notificationservice list endpoint', { fe: 'read', 'ns-api': 'read', 'ns-threads': 'read' }],
+      ['POST /tasks/:code/links {EmailThread, thr_…}', 'Requires the task update permission', { fe: 'read', 'ts-api': 'read' }],
+      ['Validate the thread', 'gRPC GetEmailThread; fails fast if notificationservice is down, nothing written', { 'ts-api': 'read', 'ns-api': 'read', 'ns-threads': 'read' }],
+      ['Insert link row, bump task.version', 'Unique constraint makes a repeat a no-op', { 'ts-links': 'write', 'ts-tasks': 'write' }],
+      ['Emit changelog event', 'Task updated with the new link', { kafka: 'write' }]
+    ]},
+    { name: 'Unlink', steps: [
+      ['User removes an email from the task page', '', { fe: 'read' }],
+      ['DELETE /tasks/:code/links/EmailThread/thr_…', 'No call to notificationservice at all', { 'ts-api': 'read' }],
+      ['Delete link row, bump task.version', '', { 'ts-links': 'write', 'ts-tasks': 'write' }],
+      ['Emit changelog event', '', { kafka: 'write' }]
+    ]},
+    { name: 'Delete the task', steps: [
+      ['DELETE /tasks/:code', 'Existing endpoint, unchanged', { fe: 'read', 'ts-api': 'read' }],
+      ['Task row soft-deleted, link rows removed by cascade', 'Same transaction. Notificationservice never hears about it and does not need to', { 'ts-tasks': 'write', 'ts-links': 'write' }],
+      ['Email page next load', 'filters=links.code== simply returns one task fewer', { fe: 'read', 'ts-api': 'read', 'ts-links': 'read' }]
+    ]},
+    { name: 'Thread goes missing', steps: [
+      ['Task page loads', 'GET /tasks/:code returns links as codes', { fe: 'read', 'ts-api': 'read', 'ts-links': 'read' }],
+      ['Frontend fetches thread details', 'GET /email-threads?filters=code$in:… in one call', { fe: 'read', 'ns-api': 'read', 'ns-threads': 'read' }],
+      ['One code does not come back', 'Rendered as "unavailable" next to its code. No write, no cleanup job. The user can unlink it.', { fe: 'fail' }]
+    ]}
+  ];
+  var fi = 0, si = 0;
+  var tabs = document.getElementById('flow-tabs'), stepsEl = document.getElementById('flow-steps'), pos = document.getElementById('flow-pos');
+  tabs.innerHTML = FLOWS.map(function (f, i) { return '<button type="button" data-f="' + i + '">' + f.name + '</button>'; }).join('');
+  function paint() {
+    tabs.querySelectorAll('button').forEach(function (b, i) { b.classList.toggle('on', i === fi); });
+    var f = FLOWS[fi];
+    stepsEl.innerHTML = f.steps.map(function (s, i) { return '<li class="' + (i === si ? 'on' : '') + '" data-s="' + i + '">' + s[0] + (s[1] ? '<small>' + s[1] + '</small>' : '') + '</li>'; }).join('');
+    var hits = f.steps[si][2];
+    document.querySelectorAll('#flow-boxes .box').forEach(function (b) {
+      b.classList.remove('hit', 'read', 'write', 'fail');
+      var op = b.querySelector('.op'); if (op) op.remove();
+      var k = hits[b.dataset.box];
+      if (k) { b.classList.add('hit', k); b.insertAdjacentHTML('afterbegin', '<span class="op">' + k + '</span>'); }
+    });
+    pos.textContent = 'Step ' + (si + 1) + ' of ' + f.steps.length;
+  }
+  tabs.addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (!b) return; fi = +b.dataset.f; si = 0; paint(); });
+  stepsEl.addEventListener('click', function (e) { var li = e.target.closest('[data-s]'); if (!li) return; si = +li.dataset.s; paint(); });
+  document.getElementById('flow-next').addEventListener('click', function () { if (si < FLOWS[fi].steps.length - 1) si++; paint(); });
+  document.getElementById('flow-prev').addEventListener('click', function () { if (si > 0) si--; paint(); });
+  paint();
+})();
+</script>
 </body>
 </html>
