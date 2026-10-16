@@ -8,19 +8,19 @@
   :root {
     --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e5e8;
     --panel: #f6f7f9; --accent: #1f5fbf; --accent-bg: #e8f0fe; --warn-bg: #fff4e5; --warn: #8a5300;
-    --code-bg: #f1f3f5;
+    --code-bg: #f1f3f5; --new: #1e7f4f; --new-bg: #e6f6ec; --derived: #6b3fb5; --derived-bg: #f0e9fb;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
       --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
-      --code-bg: #22262c;
+      --code-bg: #22262c; --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
     }
   }
   :root[data-theme="dark"] {
     --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36;
     --panel: #1b1e23; --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c;
-    --code-bg: #22262c;
+    --code-bg: #22262c; --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -50,6 +50,31 @@
   .mock .row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
   .mock .row.th { color: var(--muted); font-size: 12.5px; border-top: none; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: var(--accent-bg); color: var(--accent); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin: 8px 0 18px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend .l-keep::before { background: var(--panel); border: 1px solid var(--line); }
+  .legend .l-new::before { background: var(--new-bg); border: 1px solid var(--new); }
+  .legend .l-derived::before { background: var(--derived-bg); border: 1px solid var(--derived); }
+  .schema { margin: 18px 0 26px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .schema.is-new { border-color: var(--new); }
+  .schema .name { padding: 9px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 600; background: var(--panel); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .schema.is-new .name { background: var(--new-bg); color: var(--new); }
+  .schema .name small { font-weight: 500; color: var(--muted); font-family: inherit; font-size: 12px; }
+  .schema.is-new .name small { color: var(--new); }
+  .schema table { margin: 0; font-size: 13.5px; }
+  .schema td, .schema th { padding: 6px 14px; }
+  .schema tr:last-child td { border-bottom: none; }
+  .schema td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  .schema tr.new td { background: var(--new-bg); }
+  .schema tr.new td:first-child { color: var(--new); font-weight: 600; }
+  .schema tr.derived td { background: var(--derived-bg); }
+  .schema tr.derived td:first-child { color: var(--derived); font-weight: 600; }
+  .schema tr.muted td { color: var(--muted); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+  .tag.new { background: var(--new); color: #fff; }
+  .tag.derived { background: var(--derived); color: #fff; }
+  .schema .foot { padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); }
+  .schema.is-new .foot { background: var(--new-bg); }
   svg text { font-family: inherit; }
   @media (max-width: 600px) { .mock .row { grid-template-columns: 1fr 1fr; } }
 </style>
@@ -86,17 +111,92 @@
     Mirrors the existing <code>EntityRef {type, code}</code>. Documents or comments can be linked later without a new table or new endpoints.
     The alternative, a dedicated <code>task_email_threads</code> table, costs the same today and one more table next time.</div>
 
-  <h2>3. Data model (taskservice)</h2>
-  <table>
-    <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
-    <tr><td><code>id</code></td><td>serial</td><td></td></tr>
-    <tr><td><code>task_id</code></td><td>int</td><td>FK → tasks.id, <code>ON DELETE CASCADE</code></td></tr>
-    <tr><td><code>link_type</code></td><td>varchar</td><td>enum, only <code>EmailThread</code> initially</td></tr>
-    <tr><td><code>link_code</code></td><td>varchar</td><td>the thread code, e.g. <code>thr_a1b2c3d4e5</code></td></tr>
-    <tr><td><code>owner</code>, <code>tenant_hierarchy</code></td><td>varchar</td><td>same defaults as tasks (RLS)</td></tr>
-    <tr><td><code>created_by</code>, <code>created_at</code></td><td></td><td>who linked it and when</td></tr>
-    <tr><td colspan="3">Unique <code>(task_id, link_type, link_code)</code> · Index <code>(link_type, link_code)</code> for the "tasks for this thread" lookup</td></tr>
-  </table>
+  <h2>3. Database tables</h2>
+  <p>Every table the feature touches, column by column. Only one table is created; the existing ones keep their shape.</p>
+  <div class="legend">
+    <span class="l-keep">Existing, unchanged</span>
+    <span class="l-new">Added by this feature</span>
+    <span class="l-derived">Derived at query time, not stored</span>
+  </div>
+
+  <div class="schema is-new">
+    <div class="name">taskservice · task_links <small>new table</small></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+      <tr class="new"><td>id</td><td>serial PK</td><td></td></tr>
+      <tr class="new"><td>task_id</td><td>integer</td><td>FK → tasks.id, <code>ON DELETE CASCADE</code></td></tr>
+      <tr class="new"><td>link_type</td><td>varchar</td><td>only <code>EmailThread</code> for now; enum lives in code, not in the DB</td></tr>
+      <tr class="new"><td>link_code</td><td>varchar</td><td>thread code, e.g. <code>thr_a1b2c3d4e5</code></td></tr>
+      <tr class="new"><td>owner</td><td>varchar</td><td>default <code>split_part(current_user, ':', 1)</code>, same as tasks</td></tr>
+      <tr class="new"><td>tenant_hierarchy</td><td>varchar</td><td>default <code>current_user</code></td></tr>
+      <tr class="new"><td>created_by</td><td>varchar</td><td>who linked it</td></tr>
+      <tr class="new"><td>created_at</td><td>timestamptz</td><td></td></tr>
+    </table>
+    <div class="foot">Unique <code>(task_id, link_type, link_code)</code> · Index <code>idx_task_links_type_code (link_type, link_code)</code> for "tasks for this thread" · RLS policy copied from tasks</div>
+  </div>
+
+  <div class="schema">
+    <div class="name">taskservice · tasks <small>no column changes</small></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>id, code</td><td>serial, varchar</td><td><code>task_…</code></td></tr>
+      <tr><td>subject, description</td><td>varchar</td><td></td></tr>
+      <tr><td>assignee, reporter, priority</td><td>varchar</td><td></td></tr>
+      <tr><td>status_id</td><td>integer</td><td>FK → statuses</td></tr>
+      <tr><td>due_date</td><td>timestamptz</td><td></td></tr>
+      <tr><td>entity_type, entity_code, entity_number</td><td>varchar</td><td>the existing single-valued entity link, untouched</td></tr>
+      <tr><td>user_group_code</td><td>varchar</td><td></td></tr>
+      <tr><td>version</td><td>integer</td><td>optimistic locking; bumped on link / unlink so clients refetch</td></tr>
+      <tr><td>owner, tenant_hierarchy, created_by, updated_by, created_at, updated_at, deleted_at</td><td></td><td></td></tr>
+      <tr class="derived"><td>links <span class="tag derived">API</span></td><td>TaskLink[]</td><td>joined from <code>task_links</code> on read; always returned on <code>Task</code>, filterable via <code>links.type</code>, <code>links.code</code></td></tr>
+    </table>
+  </div>
+
+  <div class="schema">
+    <div class="name">taskservice · tasks_history <small>no column changes</small></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+      <tr class="muted"><td>(mirror of tasks)</td><td></td><td>filled by trigger on <code>tasks</code></td></tr>
+    </table>
+    <div class="foot">Link rows never pass through this trigger. Link and unlink are instead recorded through the changelog producer as task updates, so the audit trail stays complete without a second history table.</div>
+  </div>
+
+  <div class="schema">
+    <div class="name">notificationservicev2 · email_threads <small>no column changes, two derived fields</small></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+      <tr><td>id, code</td><td>serial, varchar</td><td><code>thr_…</code></td></tr>
+      <tr><td>entity_type, entity_code, entity_number</td><td>varchar</td><td>the thread's own entity link, independent of the task's</td></tr>
+      <tr><td>subject, status</td><td>varchar</td><td><code>open</code> / <code>closed</code></td></tr>
+      <tr><td>mailbox, conversation_id</td><td>varchar</td><td>Graph only</td></tr>
+      <tr><td>owner, tenant_hierarchy, created_by, updated_by, created_at, updated_at, deleted_at</td><td></td><td></td></tr>
+      <tr class="derived"><td>message_count <span class="tag derived">API</span></td><td>integer</td><td><code>count(email_messages.id) where thread_code = code and kind = 'message'</code></td></tr>
+      <tr class="derived"><td>last_message_at <span class="tag derived">API</span></td><td>timestamptz</td><td><code>max(coalesce(received_at, sent_at))</code> over the same rows</td></tr>
+    </table>
+    <div class="foot">Both aggregates are a subquery on the thread list and get queries. No migration in notificationservicev2.</div>
+  </div>
+
+  <div class="schema">
+    <div class="name">notificationservicev2 · email_messages <small>untouched</small></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+      <tr class="muted"><td>thread_code</td><td>varchar</td><td>FK → email_threads.code; only used for the aggregates above</td></tr>
+    </table>
+  </div>
+
+  <h3>Migration (taskservice)</h3>
+<pre><code>CREATE TABLE task_links (
+  id               serial PRIMARY KEY,
+  task_id          integer NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  link_type        varchar NOT NULL,
+  link_code        varchar NOT NULL,
+  owner            varchar NOT NULL DEFAULT split_part(current_user, ':', 1),
+  tenant_hierarchy varchar NOT NULL DEFAULT current_user,
+  created_by       varchar NOT NULL DEFAULT 'Emil System',
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_task_links UNIQUE (task_id, link_type, link_code)
+);
+CREATE INDEX idx_task_links_type_code ON task_links (link_type, link_code);</code></pre>
   <p>Taskservice stores <strong>only the code</strong>. Subject, status and activity of the thread are fetched live, so nothing goes stale.</p>
 
   <h2>4. API changes</h2>
