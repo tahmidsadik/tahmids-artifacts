@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Email Links Plan</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e5e8; --panel: #f6f7f9;
+    --accent: #1f5fbf; --accent-bg: #e8f0fe; --warn-bg: #fff4e5; --warn: #8a5300; --code-bg: #f1f3f5;
+    --new: #1e7f4f; --new-bg: #e6f6ec; --derived: #6b3fb5; --derived-bg: #f0e9fb;
+    --task: #b45309; --task-bg: #fef3c7; --thread: #0e7490; --thread-bg: #cffafe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36; --panel: #1b1e23;
+      --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c; --code-bg: #22262c;
+      --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+      --task: #fbbf24; --task-bg: #3b2f0c; --thread: #67e8f9; --thread-bg: #0f3540;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2f36; --panel: #1b1e23;
+    --accent: #8ab4f8; --accent-bg: #1d2b45; --warn-bg: #3a2c12; --warn: #f5c16c; --code-bg: #22262c;
+    --new: #6fd39a; --new-bg: #16301f; --derived: #c4a6f2; --derived-bg: #2a1f3d;
+    --task: #fbbf24; --task-bg: #3b2f0c; --thread: #67e8f9; --thread-bg: #0f3540;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 940px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  h2 { font-size: 22px; margin: 52px 0 6px; padding-top: 20px; border-top: 1px solid var(--line); scroll-margin-top: 12px; }
+  h2 .q { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p, li { max-width: 74ch; }
+  a { color: var(--accent); }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: .9em; overflow-wrap: anywhere; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13.5px; line-height: 1.5; margin: 10px 0; }
+  pre code { background: none; padding: 0; overflow-wrap: normal; }
+  .tw { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td:first-child code { white-space: nowrap; }
+  .answer { background: var(--accent-bg); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 12px 0 20px; }
+  .answer strong { display: block; margin-bottom: 2px; }
+  .decision { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .decision strong { color: var(--warn); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--muted); margin: 4px 0 12px; }
+  .meta b { color: var(--fg); font-weight: 600; }
+
+  .pagetabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 24px; }
+  .pagetabs a { padding: 8px 14px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .pagetabs a:hover { color: var(--fg); }
+  .pagetabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* waves */
+  .waves { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 14px 0 8px; }
+  .wave h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .wave h4 span { display: block; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12.5px; }
+  .pr { display: block; text-decoration: none; color: inherit; border: 1px solid var(--line); border-left: 4px solid var(--c, var(--accent)); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel); }
+  .pr:hover { border-color: var(--c, var(--accent)); }
+  .pr b { display: block; font-size: 14px; }
+  .pr small { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
+  .pr span { display: block; font-size: 13px; }
+  .pr em { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .c-proto { --c: var(--derived); } .c-be { --c: var(--new); } .c-sdk { --c: var(--accent); } .c-fe { --c: var(--task); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; background: var(--c); }
+  @media (max-width: 760px) { .waves { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 460px) { .waves { grid-template-columns: 1fr; } }
+
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 10px 0; }
+  .steps > li { position: relative; padding: 2px 0 12px 38px; }
+  .steps > li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-bg); color: var(--accent); font-size: 12.5px; font-weight: 600; text-align: center; line-height: 24px; }
+  .steps ul { margin: 6px 0 0; padding-left: 18px; font-size: 14.5px; }
+  .out { list-style: none; padding: 0; }
+  .out li { padding: 6px 0 6px 22px; position: relative; border-bottom: 1px solid var(--line); }
+  .out li::before { content: "–"; position: absolute; left: 4px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <nav class="pagetabs"><a href="./">Design</a><a href="plan" aria-current="page">Implementation plan</a></nav>
+  <h1>Implementation plan</h1>
+  <p class="sub">Task ↔ Email Links · protorepo, taskservice, notificationservicev2, task-sdk, task-management-frontend, nsv2-frontend · 2026-10-16 · Proposed</p>
+
+  <div class="answer">
+    <strong>Summary</strong>
+    Tasks get a many-to-many relation to email threads, in addition to the existing single entity link. The relation lives in one new taskservice table, <code>task_links</code>, keyed by <code>(task_id, link_type, link_code)</code> with <code>link_type = 'EmailThread'</code> for now. Taskservice stores only the thread code and validates it against notificationservicev2 at link time. Everything else about a thread is read live, so nothing needs syncing.
+  </div>
+
+  <p>Six PRs in four waves. Waves 1 and 2 are backend and can ship without any UI; waves 3 and 4 are SDK and frontend. PR-2 and PR-3 can be reviewed in parallel; PR-5 and PR-6 are independent of each other.</p>
+
+  <div class="waves">
+    <div class="wave"><h4>Wave 1<span>Contracts</span></h4>
+      <a class="pr c-proto" href="#pr1"><b>PR-1 Proto</b><small>protorepo</small><span><code>TaskLink</code>, link rpcs, thread aggregates</span><em>No dependencies</em></a>
+    </div>
+    <div class="wave"><h4>Wave 2<span>Backend</span></h4>
+      <a class="pr c-be" href="#pr2"><b>PR-2 Task links</b><small>taskservice</small><span><code>task_links</code> table, link endpoints, list filter</span><em>After PR-1 merged</em></a>
+      <a class="pr c-be" href="#pr3"><b>PR-3 Thread aggregates</b><small>notificationservicev2</small><span><code>message_count</code>, <code>last_message_at</code></span><em>After PR-1 merged</em></a>
+    </div>
+    <div class="wave"><h4>Wave 3<span>SDK</span></h4>
+      <a class="pr c-sdk" href="#pr4"><b>PR-4 SDK</b><small>task-sdk</small><span>Regenerate with <code>links</code> and link endpoints</span><em>After PR-2 on test</em></a>
+    </div>
+    <div class="wave"><h4>Wave 4<span>Frontend</span></h4>
+      <a class="pr c-fe" href="#pr5"><b>PR-5 Emails on task</b><small>task-management-frontend</small><span>"Emails" section on the task page</span><em>After PR-3, PR-4</em></a>
+      <a class="pr c-fe" href="#pr6"><b>PR-6 Tasks on thread</b><small>nsv2-frontend</small><span>"Tasks" panel on the thread page</span><em>After PR-2, PR-4</em></a>
+    </div>
+  </div>
+  <div class="legend"><span class="c-proto">Contracts</span><span class="c-be">Backend</span><span class="c-sdk">SDK</span><span class="c-fe">Frontend</span></div>
+
+  <!-- PR-1 -->
+  <h2 id="pr1"><span class="q">PR-1 · Wave 1</span>protorepo</h2>
+  <div class="meta"><span><b>Branch</b> <code>PPL-XXX/task-email-links</code></span><span><b>Depends on</b> nothing</span></div>
+  <p>Goes first because every service's PR pipeline compiles against protorepo <code>master</code>, so proto changes must be merged before the service PRs can pass.</p>
+  <h3><code>taskservice/v1/task.proto</code></h3>
+<pre><code>message TaskLink {
+  string type = 1; // "EmailThread"
+  string code = 2;
+}
+
+message Task {
+  ...
+  repeated TaskLink links = 22; // Always returned
+}
+
+message CreateTaskRequest {
+  ...
+  repeated TaskLink links = 12;
+}
+
+message AddTaskLinkRequest {
+  string code = 1;
+  TaskLink link = 2;
+}
+message AddTaskLinkResponse { Task task = 1; }
+
+message RemoveTaskLinkRequest {
+  string code = 1;
+  string link_type = 2;
+  string link_code = 3;
+}
+message RemoveTaskLinkResponse { Task task = 1; }</code></pre>
+  <h3><code>taskservice/v1/taskservice.proto</code></h3>
+<pre><code>rpc AddTaskLink(AddTaskLinkRequest) returns (AddTaskLinkResponse) {}
+rpc RemoveTaskLink(RemoveTaskLinkRequest) returns (RemoveTaskLinkResponse) {}</code></pre>
+  <h3><code>notificationservice/v1/email-thread.proto</code></h3>
+<pre><code>message EmailThread {
+  ...
+  uint32 message_count = 10;
+  optional google.protobuf.Timestamp last_message_at = 11;
+}</code></pre>
+  <div class="decision"><strong>Decision:</strong> <code>PatchTaskRequest</code> is deliberately untouched. Links are managed only through the two dedicated rpcs, so a patch can never silently wipe them.</div>
+  <p><b>Checks:</b> <code>buf lint</code>, <code>buf breaking</code> against master (all additive).</p>
+
+  <!-- PR-2 -->
+  <h2 id="pr2"><span class="q">PR-2 · Wave 2</span>taskservice</h2>
+  <div class="meta"><span><b>Branch</b> <code>PPL-XXX/task-email-links</code></span><span><b>Depends on</b> PR-1 merged; run <code>npm run generate:code</code> after pulling protorepo master</span></div>
+
+  <h3>Migration</h3>
+  <p><code>migrations/&lt;ts&gt;-create-task-links.migration.ts</code></p>
+<pre><code>CREATE TABLE task_links (
+  id               serial PRIMARY KEY,
+  task_id          integer NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  link_type        varchar NOT NULL,
+  link_code        varchar NOT NULL,
+  owner            varchar NOT NULL DEFAULT split_part(current_user, ':', 1),
+  tenant_hierarchy varchar NOT NULL DEFAULT current_user,
+  created_by       varchar NOT NULL DEFAULT 'Emil System',
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_task_links UNIQUE (task_id, link_type, link_code)
+);
+CREATE INDEX idx_task_links_type_code ON task_links (link_type, link_code);</code></pre>
+  <p>Plus the RLS policy, copied from the <code>tasks</code> table migration. Additive, no backfill, no downtime. <code>tasks_history</code> is not touched; link changes are recorded through the changelog producer instead.</p>
+
+  <h3>Entity and repository</h3>
+  <div class="tw"><table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>entities/task-link.entity.ts</code></td><td>New <code>TaskLinkEntity</code> (<code>@Entity('task_links')</code>), <code>@ManyToOne(() =&gt; TaskEntity)</code> on <code>task_id</code>.</td></tr>
+    <tr><td><code>entities/task.entity.ts</code></td><td><code>@OneToMany(() =&gt; TaskLinkEntity, (l) =&gt; l.task) links</code>. <code>@AfterLoad</code> maps to <code>linkRefs: TaskLink[]</code> the same way <code>categorySlugs</code> is derived.</td></tr>
+    <tr><td><code>providers/repos.provider.ts</code></td><td>Register the <code>TaskLinkEntity</code> repository.</td></tr>
+    <tr><td><code>config/typeorm.config.ts</code></td><td>Add the entity to the entities list if they are enumerated.</td></tr>
+    <tr><td><code>src/const.ts</code></td><td><code>enum TaskLinkType { EmailThread = 'EmailThread' }</code>.</td></tr>
+  </table></div>
+  <p style="font-size:13.5px;color:var(--muted)">Paths under <code>src/modules/task/</code> unless shown otherwise.</p>
+
+  <h3>Link validation</h3>
+  <div class="tw"><table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>config/grpc-client-config/notificationservice.config.ts</code></td><td>New, copy of <code>claimservice.config.ts</code> pointing at <code>protorepo/notificationservice/v1/notificationservice.proto</code>, env <code>NOTIFICATIONSERVICE_SERVICE_HOST</code> / <code>NOTIFICATIONSERVICE_SERVICE_PORT_GRPC</code>.</td></tr>
+    <tr><td><code>config/env.schema.ts</code>, <code>.local.env</code>, <code>kubernetes/base</code></td><td>Add the two env vars.</td></tr>
+    <tr><td><code>task.module.ts</code></td><td>Register the client with <code>ClientsModule</code>.</td></tr>
+    <tr><td><code>services/linked-entity-resolver.service.ts</code></td><td>Add <code>resolveLink(type, code)</code>. For <code>EmailThread</code> it calls <code>EmailTrackingService.GetEmailThread</code> with the forwarded headers and throws <code>NotFoundException</code> on <code>NOT_FOUND</code>. Unknown type → <code>BadRequestException</code>.</td></tr>
+  </table></div>
+  <p>Request-scoped like the existing resolver, so the caller's headers (and tenant) are forwarded.</p>
+
+  <h3>Service — <code>services/task.service.ts</code></h3>
+  <div class="tw"><table>
+    <tr><th>Method</th><th>Behaviour</th></tr>
+    <tr><td><code>createTask</code></td><td>Validate every entry of <code>request.links</code>, insert task and link rows in one transaction, emit <code>emitTaskCreated</code> with links in the payload.</td></tr>
+    <tr><td><code>addTaskLink(code, link)</code></td><td>Load task, <code>resolveLink</code>, insert with <code>ON CONFLICT DO NOTHING</code> (idempotent), bump <code>version</code>, emit a task-updated changelog with before/after links, return the task.</td></tr>
+    <tr><td><code>removeTaskLink(code, type, linkCode)</code></td><td>Delete the row, bump <code>version</code>, emit changelog, return the task. A missing row is a no-op, not a 404.</td></tr>
+    <tr><td><code>getTask</code>, <code>listTasks</code></td><td>Load the <code>links</code> relation.</td></tr>
+    <tr><td><code>deleteTask</code></td><td>Nothing to do, the FK cascades.</td></tr>
+  </table></div>
+
+  <h3>Paginate config — <code>entity-queries/task/task.config.ts</code></h3>
+<pre><code>relations: ["status", "categories", "links"],
+filterableColumns: {
+  ...
+  "links.type": [FilterOperator.EQ],
+  "links.code": [FilterOperator.EQ, FilterOperator.IN],
+},</code></pre>
+  <div class="decision"><strong>To verify:</strong> <code>TaskEntityQuery</code> must not deduplicate rows in a way that breaks a task with several links. If nestjs-paginate joins one-to-many, confirm <code>total_items</code> counts tasks and not join rows.</div>
+
+  <h3>Controllers, DTOs, responses</h3>
+  <div class="tw"><table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>dto/task-link.dto.ts</code></td><td><code>TaskLinkDto { @IsEnum(TaskLinkType) type; @IsNotEmptyString code }</code>.</td></tr>
+    <tr><td><code>dto/create-task-request.dto.ts</code></td><td><code>@ValidateNested({ each: true }) links?: TaskLinkDto[]</code>.</td></tr>
+    <tr><td><code>dto/add-task-link-request.dto.ts</code>, <code>dto/remove-task-link-request.dto.ts</code></td><td>New.</td></tr>
+    <tr><td><code>responses/task/task.class.ts</code></td><td><code>links: TaskLinkClass[]</code> with swagger example.</td></tr>
+    <tr><td><code>responses/task/add-task-link-response.class.ts</code>, <code>remove-task-link-response.class.ts</code></td><td>New.</td></tr>
+    <tr><td><code>controllers/task.worker.ts</code></td><td><code>@GrpcMethod</code> handlers <code>AddTaskLink</code>, <code>RemoveTaskLink</code>.</td></tr>
+    <tr><td><code>controllers/task.controller.ts</code></td><td><code>POST /tasks/:code/links</code> and <code>DELETE /tasks/:code/links/:type/:linkCode</code>, both behind the task update permission. Swagger descriptions neutral, no tenant names.</td></tr>
+  </table></div>
+
+  <h3>Changelog</h3>
+  <p><code>services/changelog-producer.service.ts</code>: include <code>links</code> in the serialised task so create and update events carry them. No new event type.</p>
+
+  <h3>Tests</h3>
+  <ul>
+    <li><code>src/tests/e2e/task/task-links.spec.ts</code>: create with links, add, add again (idempotent, one row), remove, remove again (no-op), list by <code>links.code</code>, list by <code>links.code $in</code>, 404 on unknown thread, cascade on delete, tenant isolation.</li>
+    <li>Mock the notificationservice gRPC client the same way the claim and partner clients are mocked in <code>src/tests/common/helpers.ts</code>.</li>
+    <li>Unit test for <code>resolveLink</code> covering <code>NOT_FOUND</code>, transport error, unknown type.</li>
+  </ul>
+
+  <h3>Docs</h3>
+  <p><code>README.md</code> env table gets the two new vars. The plan's status moves to Implemented when merged.</p>
+
+  <!-- PR-3 -->
+  <h2 id="pr3"><span class="q">PR-3 · Wave 2</span>notificationservicev2</h2>
+  <div class="meta"><span><b>Branch</b> <code>PPL-XXX/thread-aggregates</code></span><span><b>Depends on</b> PR-1 merged</span></div>
+  <div class="tw"><table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>entity-queries/email-thread/email-thread-entity.query.ts</code></td><td>Add two subselects to the list and get queries: <code>count(*)</code> and <code>max(coalesce(received_at, sent_at))</code> over <code>email_messages</code> where <code>thread_code = thread.code</code> and <code>kind = 'message'</code>.</td></tr>
+    <tr><td><code>entities/email-thread.entity.ts</code></td><td>Virtual (non-column) fields <code>messageCount</code>, <code>lastMessageAt</code> populated from the raw query.</td></tr>
+    <tr><td><code>response-classes/email-thread.class.ts</code></td><td>Expose both with swagger descriptions.</td></tr>
+    <tr><td><code>entity-queries/email-thread/email-thread.config.ts</code></td><td><code>lastMessageAt</code> as a sortable column, so the thread list can order by activity.</td></tr>
+    <tr><td><code>src/tests/e2e/email-tracking/*.spec.ts</code></td><td>Assert the two fields on get and list, including a thread with zero messages.</td></tr>
+  </table></div>
+  <p style="font-size:13.5px;color:var(--muted)">Paths under <code>src/modules/inbound-email/</code> unless shown otherwise.</p>
+  <p>No migration. No new endpoints. Taskservice is not a dependency of this PR.</p>
+
+  <!-- PR-4 -->
+  <h2 id="pr4"><span class="q">PR-4 · Wave 3</span>task-sdk</h2>
+  <div class="meta"><span><b>Depends on</b> PR-2 deployed to test, so the OpenAPI spec includes the new endpoints</span></div>
+  <p>Regenerate <code>@emilgroup/task-sdk</code> from the taskservice swagger and publish a beta version. Verify <code>TaskClass.links</code>, <code>addTaskLink</code>, <code>removeTaskLink</code> and the <code>links.code</code> filter are present. Bump the dependency in both frontends in PR-5 and PR-6.</p>
+
+  <!-- PR-5 -->
+  <h2 id="pr5"><span class="q">PR-5 · Wave 4</span>task-management-frontend</h2>
+  <div class="meta"><span><b>Depends on</b> PR-3 deployed (thread fields), PR-4 published</span></div>
+  <div class="tw"><table>
+    <tr><th>Area</th><th>Change</th></tr>
+    <tr><td><code>src/stores/task-store.ts</code></td><td>Keep <code>links</code> on the task model; <code>addLink(code, link)</code> and <code>removeLink(code, type, linkCode)</code> call the SDK and replace the task in the store.</td></tr>
+    <tr><td><code>src/components/EditTask/EditTaskForm.tsx</code></td><td>New "Emails" section below the entity link: list of linked threads, "Link email" button, unlink per row.</td></tr>
+    <tr><td><code>src/components/EmailLinks/</code> (new)</td><td><code>LinkedEmailsList</code> fetches <code>GET /notificationservice/v1/email-threads?filters=code$in:…</code> once for all codes and renders subject, entity number, status, <code>lastMessageAt</code>, <code>messageCount</code>. Codes not returned render as unavailable. <code>EmailThreadPicker</code> searches the same endpoint with <code>search=</code>.</td></tr>
+    <tr><td><code>src/components/NewTask/NewTaskForm.tsx</code></td><td>Accept initial <code>links</code> (used by the thread page's create button).</td></tr>
+    <tr><td><code>src/locale/*.json</code></td><td>Strings for the section, picker and unavailable state in en, de, pl.</td></tr>
+    <tr><td>Stories</td><td><code>LinkedEmailsList.stories.tsx</code>, <code>EmailThreadPicker.stories.tsx</code>.</td></tr>
+  </table></div>
+  <p>The notificationservice calls need the email view permission; the section hides itself on 403.</p>
+
+  <!-- PR-6 -->
+  <h2 id="pr6"><span class="q">PR-6 · Wave 4</span>nsv2-frontend</h2>
+  <div class="meta"><span><b>Depends on</b> PR-2 deployed, PR-4 published</span></div>
+  <div class="tw"><table>
+    <tr><th>Area</th><th>Change</th></tr>
+    <tr><td><code>src/components/email-threads/thread-detail.tsx</code></td><td>Mount a tasks panel under the header.</td></tr>
+    <tr><td><code>src/components/email-threads/thread-tasks.tsx</code> (new)</td><td>Lists tasks via <code>GET /tasks?filters=links.code==&lt;thread&gt;</code> showing subject, status, priority, assignee, due date. "Create task from this email" opens the task create form with <code>links: [{EmailThread, code}]</code> and the thread's <code>entityRef</code> prefilled as the task entity link.</td></tr>
+    <tr><td><code>src/hooks/use-tasks.ts</code> (new)</td><td>React Query hooks over the task SDK.</td></tr>
+  </table></div>
+  <div class="decision"><strong>Open question:</strong> if the task widget (<code>apps-taskwidget</code>) is the preferred host instead of a bespoke panel, extend <code>EntityTaskListWidget</code> with a <code>pinnedLink</code> prop and mount that instead. Decide during PR-5 review.</div>
+
+  <!-- Rollout -->
+  <h2 id="rollout"><span class="q">Rollout</span>Rollout and verification</h2>
+  <ol class="steps">
+    <li>Merge PR-1. Confirm <code>buf breaking</code> is clean.</li>
+    <li>Merge and deploy PR-2 and PR-3 to test in any order. Run migrations on test. Smoke test with curl:
+      <ul>
+        <li><code>POST /tasks/:code/links</code> with a real <code>thr_</code> code → 200 with <code>links</code> populated.</li>
+        <li>Same call again → 200, still one link.</li>
+        <li>Unknown code → 404.</li>
+        <li><code>GET /tasks?filters=links.code==thr_…</code> → the task.</li>
+        <li><code>GET /email-threads/:code</code> → <code>messageCount</code>, <code>lastMessageAt</code> present.</li>
+      </ul>
+    </li>
+    <li>Publish PR-4, bump both frontends.</li>
+    <li>Deploy PR-5 and PR-6 to test and click through: create from email, link existing, unlink, thread page shows the task, task page shows the thread.</li>
+    <li>Staging and production follow the normal promotion. The migration is additive, so no coordination between the services' deploy times is needed.</li>
+  </ol>
+
+  <!-- Out of scope -->
+  <h2 id="scope"><span class="q">Scope</span>Out of scope</h2>
+  <ul class="out">
+    <li>Backfilling links for existing tasks or threads.</li>
+    <li>Message-level links. A nullable <code>message_code</code> on <code>task_links</code> can be added later without changing the API shape.</li>
+    <li>Automation that creates tasks when an email arrives. The <code>EmailReceived</code> service event already exists for that.</li>
+    <li>Link types other than <code>EmailThread</code>. The table and endpoints accept them structurally, but validation only knows email threads.</li>
+  </ul>
+</main>
+</body>
+</html>
