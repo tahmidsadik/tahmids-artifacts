@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Software Factory · Integration Architecture</title>
+<title>Software Factory · Architecture</title>
 <style>
   :root { --bg: #f4f5f7; --surface: #fff; --line: #d9dde3; --fg: #161a1f; --muted: #5f6873; --accent: #1f5fbf; --code: #eef0f3; --ok: #1e7f4f; --warn: #a15c00; }
   @media (prefers-color-scheme: dark) {
@@ -45,169 +45,206 @@
 <body>
 <main>
   <div class="eyebrow">tahmid.dev · Software Factory</div>
-  <h1>Integration Architecture</h1>
-  <p class="lead">How Software Factory talks to version control, issue trackers, CI and docs without being tied to any one vendor.</p>
-  <div class="meta"><span class="status">Draft · for discussion</span> &nbsp; <time datetime="2026-10-27">2026-10-27</time></div>
+  <h1>Software Factory Architecture</h1>
+  <p class="lead">A shared factory where AI agents and humans take work from the issue tracker to verified production code, through provider-agnostic interfaces.</p>
+  <div class="meta"><span class="status">v2 · foundation in code</span> &nbsp; <time datetime="2026-10-27">2026-10-27</time> &nbsp;·&nbsp; v1 covered the integration layer only</div>
 
   <nav class="toc">
     <strong>Contents</strong>
     <ol>
-      <li><a href="#context">Context</a></li>
+      <li><a href="#goal">Goal</a></li>
       <li><a href="#shape">Overall shape</a></li>
-      <li><a href="#ports">Capability ports</a></li>
-      <li><a href="#rules">Design rules</a></li>
+      <li><a href="#lifecycle">Work item lifecycle</a></li>
+      <li><a href="#gates">Gates</a></li>
+      <li><a href="#agents">Many agents, one factory</a></li>
+      <li><a href="#reviews">Reviews</a></li>
+      <li><a href="#incidents">Incidents</a></li>
+      <li><a href="#ports">Ports and adapters</a></li>
+      <li><a href="#rules">Integration design rules</a></li>
       <li><a href="#model">Domain model</a></li>
-      <li><a href="#traits">Trait sketches</a></li>
+      <li><a href="#api">Server API</a></li>
       <li><a href="#layout">Crate layout</a></li>
-      <li><a href="#config">Project bindings</a></li>
-      <li><a href="#plan">First milestone</a></li>
+      <li><a href="#adapters">First adapters</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
       <li><a href="#questions">Open questions</a></li>
     </ol>
   </nav>
 
-  <h2 id="context">1. Context</h2>
-  <p>Software Factory is a desktop app (Rust + <a href="https://gpui.rs">GPUI</a>) that brings together the work around shipping software: issues, branches, pull requests, CI, docs and the coding agents that act on them.</p>
-  <p>At work the stack is Atlassian (Jira, Bitbucket, Confluence). Elsewhere it might be Linear and GitHub. The app should not care which. It speaks to <strong>generic capabilities</strong>, and each vendor plugs in as an <strong>adapter</strong> (ports and adapters / hexagonal architecture).</p>
+  <h2 id="goal">1. Goal</h2>
+  <p>For each piece of work the factory should:</p>
+  <ol>
+    <li>Pick an issue or feature from the issue tracker.</li>
+    <li>Review and refine the scope (and the design when needed), and get it accepted.</li>
+    <li>Implement it in the right repositories, open pull requests, and meet the quality bar and CI.</li>
+    <li>Get it reviewed by agents and humans, and revise until it's approved.</li>
+    <li>Merge it and verify the deployment.</li>
+    <li>Watch production, and track, debug and fix critical issues on its own.</li>
+  </ol>
+  <p>This foundation is built so that many agents and people can share one factory safely.</p>
 
   <h2 id="shape">2. Overall shape</h2>
-  <div class="card diagram">┌──────────────────────── software-factory (GPUI app) ────────────────────────┐
-│  Views · state · workflows        depends only on factory-core traits      │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-┌──────────────────────────────── factory-core ───────────────────────────────┐
-│  Ports (traits)   CodeHost · IssueTracker · CiProvider · DocStore ·        │
-│                   Notifier · AgentRuntime                                   │
-│  Domain model     Issue · PullRequest · Pipeline · Page · StatusCategory …  │
-│  Shared           local git ops · ids · errors · capability flags           │
-└───────┬───────────────┬───────────────┬───────────────┬─────────────────────┘
-        │               │               │               │
-  factory-jira   factory-bitbucket  factory-github  factory-linear   … more
-  (IssueTracker) (CodeHost, CI)     (CodeHost, CI)  (IssueTracker)</div>
-  <p class="muted">Dependencies only point inward. Adapters depend on core, the app depends on core, and the core depends on nothing vendor-specific.</p>
+  <div class="card diagram"> GPUI desktop    CLI    Slack (Maki)    web (later)
+       └──────────┴───────┬────┘
+           HTTP + WebSocket  (factory-api)
+                          │
+┌────────────────── factoryd  (factory-server) ──────────────────┐
+│ API              axum: REST + numbered event stream            │
+│ Orchestrator     drives work items, reports gates, schedules   │
+│ Agent pool       AgentRuntime: Claude Code, Codex, …           │
+│ Ports/adapters   IssueTracker · CodeHost · CiProvider ·        │
+│                  DeploymentTracker · AlertSource               │
+│ Ingress          webhooks + polling → events                   │
+│ Store            SQLite: work items, events, agent runs        │
+└────────────────────────────────────────────────────────────────┘</div>
+  <p>The GPUI app is one client among several. Long agent runs, webhooks and provider credentials all live in the server, so they don't depend on a window staying open. It starts as a local daemon (on the Mac or meghna) and can move to a remote host later.</p>
 
-  <h2 id="ports">3. Capability ports</h2>
+  <h2 id="lifecycle">3. Work item lifecycle</h2>
+  <div class="card diagram">Intake → Refining → AwaitingApproval → Ready → Implementing → InReview → Merging → Verifying → Done
+           ▲  └──────────┘ needs more work         │   ▲  │      ▲  │        │          │
+           └──────────── scope was wrong ──────────┘   │  ▼      │  │        │          │
+                                                       │ ChangesRequested    │          │
+Intake ─ critical incident fast track ─► Implementing  │                     │          │
+                                    merge failed: back to InReview ◄─────────┘          │
+                                    deployment broken: fix forward ◄────────────────────┘
+Cancelled: from any open stage, humans only.</div>
+  <table>
+    <tr><th>Stage</th><th>Working role</th><th>What happens</th></tr>
+    <tr><td><code>Intake</code></td><td>Triager</td><td>Pulled from the tracker or raised by monitoring.</td></tr>
+    <tr><td><code>Refining</code></td><td>Planner</td><td>Scope, acceptance criteria, design and the repos involved become a <em>proposal</em>.</td></tr>
+    <tr><td><code>AwaitingApproval</code></td><td>(none)</td><td>A decision, not work. A human accepts the proposal or sends it back.</td></tr>
+    <tr><td><code>Ready</code> / <code>Implementing</code></td><td>Implementer</td><td>Code in isolated worktrees, PRs opened and linked.</td></tr>
+    <tr><td><code>InReview</code></td><td>Reviewer</td><td>Agent and human reviews; CI and quality checks run.</td></tr>
+    <tr><td><code>ChangesRequested</code></td><td>Implementer</td><td>The PRs are updated, which starts a new revision.</td></tr>
+    <tr><td><code>Merging</code> / <code>Verifying</code></td><td>Releaser</td><td>Merge, then confirm the deployment is live and healthy.</td></tr>
+  </table>
+
+  <h2 id="gates">4. Gates</h2>
+  <p>A stage can only be left once its gates pass. Derived gates are computed from the work item. The others are reported by the orchestrator from CI, quality tools and deployment checks. Clients can never set a gate.</p>
+  <table>
+    <tr><th>Move</th><th>Gates</th></tr>
+    <tr><td>Refining → AwaitingApproval</td><td><code>ProposalReady</code> (derived)</td></tr>
+    <tr><td>AwaitingApproval → Ready</td><td><code>ScopeApproved</code> (by a human, by default)</td></tr>
+    <tr><td>Implementing → InReview</td><td><code>PullRequestOpen</code> (derived)</td></tr>
+    <tr><td>InReview → Merging</td><td><code>CiPassing</code>, <code>QualityChecks</code>, <code>ReviewsSatisfied</code> (derived)</td></tr>
+    <tr><td>Merging → Verifying</td><td><code>Merged</code></td></tr>
+    <tr><td>Verifying → Done</td><td><code>DeploymentVerified</code></td></tr>
+  </table>
+  <p class="muted">When a move is refused, the error lists the gates that are still open, e.g. <code>CiPassing failed (2 tests), ReviewsSatisfied pending</code>. An agent can act on that directly.</p>
+
+  <h2 id="agents">5. Many agents, one factory</h2>
   <div class="grid">
-    <div class="card"><strong>CodeHost</strong><span class="muted">Repos, branches, pull requests, reviews, review comments.</span>
-      <div class="tags"><span class="tag first">Bitbucket</span><span class="tag">GitHub</span><span class="tag">GitLab</span></div></div>
-    <div class="card"><strong>IssueTracker</strong><span class="muted">Issues, statuses and transitions, comments, links, sprints and cycles.</span>
-      <div class="tags"><span class="tag first">Jira</span><span class="tag">Linear</span><span class="tag">GitHub Issues</span></div></div>
-    <div class="card"><strong>CiProvider</strong><span class="muted">Pipelines, build status per commit or PR, step logs, re-runs.</span>
-      <div class="tags"><span class="tag">Bitbucket Pipelines</span><span class="tag">GitHub Actions</span></div></div>
-    <div class="card"><strong>DocStore</strong><span class="muted">Pages, search, create and update design docs.</span>
-      <div class="tags"><span class="tag">Confluence</span><span class="tag">Notion</span></div></div>
-    <div class="card"><strong>Notifier</strong><span class="muted">Post updates and review requests to people and channels.</span>
-      <div class="tags"><span class="tag">Slack</span></div></div>
-    <div class="card"><strong>AgentRuntime</strong><span class="muted">Run a coding agent on a task in a worktree, stream progress, collect the diff.</span>
-      <div class="tags"><span class="tag">Claude Code</span><span class="tag">Codex</span></div></div>
+    <div class="card"><strong>Claims</strong><span class="muted">An expiring lease on the current stage's work, for one role. Agents heartbeat by renewing it. If an agent crashes, its claim expires and another agent takes over.</span></div>
+    <div class="card"><strong>Humans can always step in</strong><span class="muted">Agents need the active claim to act. Humans don't, and only humans can cancel work.</span></div>
+    <div class="card"><strong>Compare-and-swap</strong><span class="muted">Every change bumps <code>version</code>, and mutations send <code>expected_version</code>. A stale write gets <code>409 Conflict</code>, so the caller refetches and retries.</span></div>
+    <div class="card"><strong>Finding work</strong><span class="muted">An idle agent searches <code>claimable_by: implementer</code> and claims the first hit. If it loses the race, it moves on to the next item.</span></div>
+    <div class="card"><strong>Identity from the token</strong><span class="muted">The server derives the acting <code>Actor</code> from the bearer token, so an agent can't act as a human.</span></div>
+    <div class="card"><strong>Policy per project</strong><span class="muted">Whether a human must approve scope, how many human and agent approvals are needed, and the severity from which incidents are fast-tracked.</span></div>
   </div>
-  <p><strong>Local git is not a port.</strong> Clone, branch, commit and push work the same way against every host, so they live once in core (via the <code>git</code> CLI or <code>gix</code>). Only the hosting APIs need adapters.</p>
 
-  <h2 id="rules">4. Design rules</h2>
+  <h2 id="reviews">6. Reviews</h2>
+  <ul>
+    <li>Agents and humans both review. The default policy needs <strong>1 human and 1 agent approval</strong>.</li>
+    <li><strong>No self-review:</strong> anyone who implemented the work can't review it or claim its review.</li>
+    <li><strong>Revisions:</strong> every re-entry into review starts a new revision. Approvals, CI and quality results from earlier revisions stop counting.</li>
+    <li>A reviewer's latest verdict wins. A <code>Comment</code> never overrides an approval or a change request.</li>
+  </ul>
+
+  <h2 id="incidents">7. Incidents</h2>
+  <p>Alerts from an <code>AlertSource</code> are grouped by fingerprint into <code>Incident</code> work items, one per fingerprint. Critical incidents take the fast track: they skip refinement and approval and go straight to implementation. They <strong>still go through review and every gate after that</strong>, so a fix never reaches production unreviewed. If a deployment breaks during <code>Verifying</code>, the work goes back to <code>Implementing</code> to be fixed forward.</p>
+
+  <h2 id="ports">8. Ports and adapters</h2>
+  <table>
+    <tr><th>Port</th><th>Used in</th><th>First adapter</th></tr>
+    <tr><td><code>IssueTracker</code></td><td>Intake, Refining</td><td>Jira (own client + CLI)</td></tr>
+    <tr><td><code>CodeHost</code></td><td>Implementing, review loop</td><td>Bitbucket (ported from the <code>eis</code> CLI)</td></tr>
+    <tr><td><code>CiProvider</code></td><td>review, Merging</td><td>Bitbucket Pipelines + commit statuses</td></tr>
+    <tr><td><code>AgentRuntime</code></td><td>every working stage</td><td>Claude Code in isolated worktrees</td></tr>
+    <tr><td><code>DeploymentTracker</code></td><td>Verifying</td><td>Bitbucket deployments / kubectl</td></tr>
+    <tr><td><code>AlertSource</code></td><td>Incidents</td><td>To decide (Sentry, CloudWatch, …)</td></tr>
+  </table>
+  <p>Later: GitHub (<code>CodeHost</code> + <code>CiProvider</code>), Linear (<code>IssueTracker</code>), Confluence and Notion (docs), and Slack (notifications). Local git work (clone, branch, commit, push) is the same for every host, so it isn't a port.</p>
+
+  <h2 id="rules">9. Integration design rules</h2>
   <ol class="rules">
-    <li><strong>We own the domain model.</strong> Adapters translate vendor payloads into our types, so Jira or GitHub quirks never reach the UI.</li>
-    <li><strong>Normalised status categories.</strong> Every workflow status maps to a small fixed set. Jira (status categories) and Linear (state types) both already group statuses this way, so the mapping is reliable. The vendor's own status name is kept for display.</li>
-    <li><strong>Capability flags, not lowest common denominator.</strong> Each adapter reports what it supports (sprints, story points, draft PRs, …). The UI shows features when they're available and hides them otherwise, instead of the core pretending every vendor is identical.</li>
-    <li><strong>Provider-qualified IDs.</strong> For example <code>jira:PPL-123</code> or <code>bitbucket:cover42/tenantservice#456</code>. They are opaque to the app and can be resolved back to the right adapter.</li>
-    <li><strong>An escape hatch for vendor-only data.</strong> Each entity carries an optional <code>extra: serde_json::Value</code> for things like Jira custom fields, so adapters don't have to drop them.</li>
-    <li><strong>Async and off the UI thread.</strong> All network calls run on GPUI's background executor, and the UI only ever renders cached state.</li>
-    <li><strong>Fakes from day one.</strong> In-memory fake adapters let the UI and workflows be built and tested without network access or credentials.</li>
+    <li><strong>We own the domain model.</strong> Adapters translate vendor payloads, so vendor quirks never reach the UI or the workflow.</li>
+    <li><strong>Normalised status categories</strong>, with the vendor's own name kept for display.</li>
+    <li><strong>Capability flags</strong> instead of a lowest common denominator. The UI shows features only when the provider supports them.</li>
+    <li><strong>Provider-qualified IDs</strong>, e.g. <code>jira:PPL-123</code> or <code>bitbucket:cover42/tenantservice#456</code>. They're stored as plain strings and checked when parsed.</li>
+    <li><strong>Escape hatches</strong>: <code>extra</code> for vendor-only fields, and <code>IssueQuery::native</code> for raw JQL.</li>
+    <li><strong>Markdown everywhere.</strong> The Jira adapter converts to and from ADF (Atlassian Document Format).</li>
+    <li><strong>Fakes from day one.</strong> In-memory adapters let the server and UI be built without credentials.</li>
   </ol>
 
-  <h2 id="model">5. Domain model</h2>
+  <h2 id="model">10. Domain model</h2>
   <h3>Status categories</h3>
   <table>
     <tr><th>Category</th><th>Jira status category</th><th>Linear state type</th></tr>
-    <tr><td><code>Backlog</code></td><td>To Do (in backlog)</td><td>backlog</td></tr>
-    <tr><td><code>Todo</code></td><td>To Do</td><td>unstarted</td></tr>
-    <tr><td><code>InProgress</code></td><td>In Progress</td><td>started</td></tr>
-    <tr><td><code>InReview</code></td><td>In Progress, refined by name (e.g. "Code Review")</td><td>started, refined by name</td></tr>
-    <tr><td><code>Done</code></td><td>Done</td><td>completed</td></tr>
-    <tr><td><code>Cancelled</code></td><td>Done, refined by resolution (Won't Do)</td><td>canceled</td></tr>
+    <tr><td><code>backlog</code></td><td>To Do (in backlog)</td><td>backlog</td></tr>
+    <tr><td><code>todo</code></td><td>To Do</td><td>unstarted</td></tr>
+    <tr><td><code>in_progress</code></td><td>In Progress</td><td>started</td></tr>
+    <tr><td><code>in_review</code></td><td>In Progress, refined by name (e.g. "Code Review")</td><td>started, refined by name</td></tr>
+    <tr><td><code>done</code></td><td>Done</td><td>completed</td></tr>
+    <tr><td><code>cancelled</code></td><td>Done, refined by name (e.g. "Won't Do")</td><td>canceled</td></tr>
   </table>
-  <p class="muted"><code>InReview</code> and <code>Cancelled</code> need a small per-project override map (status name → category), because neither vendor separates them cleanly.</p>
-
-  <h3>Core entities</h3>
+  <p class="muted"><code>StatusMapper</code> ships with common mappings (Code Review → in review, Won't Do → cancelled), and each project can override them. Transitions can target a category (for example "move to in review"). The adapter then picks the matching transition, and returns an error if the choice is ambiguous.</p>
+  <h3>Entities</h3>
   <table>
-    <tr><th>Entity</th><th>Key fields</th></tr>
-    <tr><td><code>Issue</code></td><td>id, key, title, description (markdown), status {category, name}, assignee, labels, links, url, extra</td></tr>
-    <tr><td><code>PullRequest</code></td><td>id, repo, source → target branch, title, state (open/draft/merged/declined), author, reviewers + approvals, linked issue ids, url</td></tr>
-    <tr><td><code>Pipeline</code></td><td>id, repo, commit, branch, state (pending/running/passed/failed), steps, url</td></tr>
-    <tr><td><code>Comment</code></td><td>id, author, body (markdown), created_at; review comments add file + line</td></tr>
-    <tr><td><code>Person</code></td><td>provider id, display name, email (when available)</td></tr>
+    <tr><th>Area</th><th>Types</th></tr>
+    <tr><td>Issues</td><td><code>Issue</code>, <code>Comment</code>, <code>Transition</code>, <code>IssueQuery</code></td></tr>
+    <tr><td>Code</td><td><code>PullRequest</code> (with issue keys extracted from branch, title and body), <code>Reviewer</code>, <code>ReviewComment</code></td></tr>
+    <tr><td>CI</td><td><code>Pipeline</code>, <code>PipelineStep</code>, <code>CommitStatus</code> (includes external checks such as Wiz, which block merges)</td></tr>
+    <tr><td>Ops</td><td><code>Deployment</code>, <code>Alert</code></td></tr>
+    <tr><td>Agents</td><td><code>AgentTask</code>, <code>AgentRun</code> (incl. <code>needs_input</code> for questions to a human)</td></tr>
+    <tr><td>Workflow</td><td><code>WorkItem</code>, <code>Stage</code>, <code>Gate</code>, <code>Claim</code>, <code>Review</code>, <code>Proposal</code>, <code>Policy</code>, <code>Actor</code></td></tr>
   </table>
-  <p class="muted">Bodies are normalised to Markdown. The Jira adapter converts to and from ADF (Atlassian Document Format).</p>
 
-  <h2 id="traits">6. Trait sketches</h2>
-<pre><code>#[async_trait]
-pub trait IssueTracker: Send + Sync {
-    fn capabilities(&amp;self) -&gt; IssueCapabilities;
-    async fn get_issue(&amp;self, id: &amp;IssueId) -&gt; Result&lt;Issue&gt;;
-    async fn search(&amp;self, query: &amp;IssueQuery) -&gt; Result&lt;Page&lt;Issue&gt;&gt;;
-    async fn comments(&amp;self, id: &amp;IssueId) -&gt; Result&lt;Vec&lt;Comment&gt;&gt;;
-    // writes (milestone 2)
-    async fn transition(&amp;self, id: &amp;IssueId, to: StatusCategory) -&gt; Result&lt;()&gt;;
-    async fn comment(&amp;self, id: &amp;IssueId, body: &amp;str) -&gt; Result&lt;Comment&gt;;
-}
+  <h2 id="api">11. Server API</h2>
+  <p>REST for actions, and a WebSocket for events. Everything is scoped by project: <code>/v1/projects/{p}/…</code>. A project binds each capability to one provider instance.</p>
+<pre><code>POST /v1/projects/{p}/work-items/search          { stages, claimable_by, issue }
+POST /v1/projects/{p}/work-items                 { kind, title, issue }
+POST /v1/projects/{p}/work-items/{w}/claim       { role, ttl_secs }
+POST /v1/projects/{p}/work-items/{w}/advance     { to, note, expected_version }
+PUT  /v1/projects/{p}/work-items/{w}/proposal    { proposal, expected_version }
+POST /v1/projects/{p}/work-items/{w}/approve-scope
+POST /v1/projects/{p}/work-items/{w}/reviews     { verdict, summary }
+POST /v1/projects/{p}/issues/search · /pull-requests/search · /pipelines/search
+GET  /v1/events?since={seq}                      work_item_updated, agent_run_updated,
+                                                 pull_request_updated, alert_updated, …</code></pre>
+  <p class="muted">Errors use one JSON body and map to HTTP statuses: <code>conflict</code> → 409 (refetch and retry), <code>not_allowed</code> → 422 (a workflow rule refused the change), <code>unauthorized</code> → 401 (re-authenticate the provider), <code>unsupported</code> → 501 (hide the feature). Events are numbered, so a client that reconnects catches up on what it missed, or is told to refetch.</p>
 
-#[async_trait]
-pub trait CodeHost: Send + Sync {
-    fn capabilities(&amp;self) -&gt; CodeHostCapabilities;
-    async fn list_pull_requests(&amp;self, repo: &amp;RepoRef, filter: PrFilter) -&gt; Result&lt;Page&lt;PullRequest&gt;&gt;;
-    async fn get_pull_request(&amp;self, id: &amp;PrId) -&gt; Result&lt;PullRequest&gt;;
-    async fn review_comments(&amp;self, id: &amp;PrId) -&gt; Result&lt;Vec&lt;ReviewComment&gt;&gt;;
-    // writes (milestone 2)
-    async fn open_pull_request(&amp;self, req: NewPullRequest) -&gt; Result&lt;PullRequest&gt;;
-}
+  <h2 id="layout">12. Crate layout</h2>
+<pre><code>software-factory/                 cargo workspace
+└── crates/
+    ├── factory-core/       ✅ model, ids, status mapping, ports, workflow, fakes (no I/O)
+    ├── factory-api/        ✅ routes, request/response types, events, errors, typed client
+    ├── factory-desktop/    ✅ GPUI client (placeholder screen, --screenshot)
+    ├── factory-jira/          Jira Cloud client + `factory jira …` CLI
+    ├── factory-bitbucket/     CodeHost + CiProvider for Bitbucket Cloud
+    └── factory-server/        factoryd: axum, tokio, sqlx/SQLite, orchestrator</code></pre>
 
-pub struct IssueQuery {
-    pub assigned_to_me: bool,
-    pub categories: Vec&lt;StatusCategory&gt;,
-    pub text: Option&lt;String&gt;,
-    pub native: Option&lt;String&gt;, // raw JQL / Linear filter when you need it
-}</code></pre>
-  <p class="muted"><code>IssueQuery::native</code> is the query-side escape hatch. The common filters are portable, and power users can still write JQL.</p>
+  <h2 id="adapters">13. First adapters</h2>
+  <div class="grid">
+    <div class="card"><strong>Bitbucket, ported from <code>eis</code></strong><span class="muted">The <code>eis</code> CLI (Go) already handles OAuth, PRs, default reviewers, pipelines (selector vs pattern) and commit statuses. We port its client logic to Rust instead of calling the CLI. The adapter reads <code>~/.eiscli/tokens.json</code> first, so an existing <code>eis auth login</code> just works.</span></div>
+    <div class="card"><strong>Jira, modelled on TWG CLI</strong><span class="muted">A Rust client and CLI using TWG's command style: <code>factory jira workitem get|search|query|transition</code>, <code>workitem comment create</code>, <code>space status query</code>. Output is a readable table, or JSON with <code>-o json</code> for agents. It authenticates with an API token first, and OAuth later.</span></div>
+  </div>
 
-  <h2 id="layout">7. Crate layout</h2>
-<pre><code>software-factory/            cargo workspace
-├── crates/
-│   ├── factory-core/        ports, domain model, ids, git ops, fakes
-│   ├── factory-jira/        IssueTracker for Jira Cloud (REST v3)
-│   ├── factory-bitbucket/   CodeHost + CiProvider for Bitbucket Cloud (REST 2.0)
-│   ├── factory-github/      (later)
-│   └── factory-linear/      (later, GraphQL)
-└── app/                     GPUI binary: views, state, wiring</code></pre>
-
-  <h2 id="config">8. Project bindings</h2>
-  <p>A <em>project</em> in Software Factory binds each capability to one configured provider instance. Credentials are stored in the macOS Keychain, never in the config file.</p>
-<pre><code># ~/.config/software-factory/projects/emil.toml
-[issues]
-provider = "jira"
-site     = "https://emil-group.atlassian.net"
-projects = ["PPL", "EQ"]
-
-[code]
-provider  = "bitbucket"
-workspace = "cover42"
-
-[status_overrides]
-"Code Review" = "InReview"
-"Won't Do"    = "Cancelled"</code></pre>
-
-  <h2 id="plan">9. First milestone (proposal)</h2>
+  <h2 id="roadmap">14. Roadmap</h2>
   <ol>
-    <li>Convert the repo to a cargo workspace and create <code>factory-core</code> with the model, the traits and fake adapters.</li>
-    <li>Build the <strong>read-only</strong> Jira adapter: my issues, an issue's details, comments.</li>
-    <li>Build the <strong>read-only</strong> Bitbucket adapter: PRs for a repo, PR detail, build status.</li>
-    <li>Make a first GPUI screen: "My work". Issues on the left, the linked PRs and their build status on the right.</li>
-    <li>Then add writes (transition, comment, open PR), and after that the AgentRuntime port.</li>
+    <li>✅ <code>factory-core</code> and <code>factory-api</code>: model, ports, workflow, contract (29 tests).</li>
+    <li><code>factory-jira</code> and the <code>factory jira</code> CLI: reads first, then transitions and comments.</li>
+    <li><code>factory-bitbucket</code>: PRs, pipelines, commit statuses.</li>
+    <li><code>factory-server</code>: SQLite store, REST and events. It runs on the fake adapters first, then the real ones.</li>
+    <li>Orchestrator: gate reporting from CI and reviews, and syncing new work in from the tracker.</li>
+    <li><code>AgentRuntime</code> for Claude Code: planner, implementer and reviewer loops.</li>
+    <li>Deployment verification, then alert intake and the incident loop.</li>
+    <li>Desktop "factory floor" view over the event stream.</li>
   </ol>
 
-  <h2 id="questions">10. Open questions</h2>
-  <div class="card q">Start with Jira and Bitbucket as the first adapters? (Proposed: yes, because they give us real daily data.)</div>
-  <div class="card q">Read-only first, with writes in milestone 2? (Proposed: yes.)</div>
-  <div class="card q">Link issues and PRs by Jira key in the branch name or PR title (e.g. <code>PPL-123</code>), as Atlassian already does? Or keep our own link store as well?</div>
-  <div class="card q">Should the app keep a local cache (SQLite) so it works offline and loads instantly, or always fetch live at first?</div>
-  <div class="card q">Is the factory's core loop "issue → agent works in a worktree → PR → review → merge", with the integrations serving that loop? That would make AgentRuntime the next port after the read-only adapters.</div>
+  <h2 id="questions">15. Open questions</h2>
+  <div class="card q">Which monitoring should be the first <code>AlertSource</code> for EIS: CloudWatch, Sentry, or Kubernetes health checks?</div>
+  <div class="card q">Should the default review policy be 1 human + 1 agent for everything, or should chores and docs be allowed agent-only review?</div>
+  <div class="card q">Should a factory work item be written back to Jira (status transitions, comments with links to PRs), or should Jira only be read from at first?</div>
+  <div class="card q">Agent isolation: a git worktree per work item on the host, or a container per run from the start?</div>
 </main>
 </body>
 </html>

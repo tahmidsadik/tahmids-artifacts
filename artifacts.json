@@ -1,8 +1,8 @@
 [
   {
     "slug": "software-factory-integrations",
-    "title": "Software Factory Integrations",
-    "summary": "Provider-agnostic integration architecture for Software Factory: capability ports (code hosting, issue tracking, CI, docs, agents) with Jira, Bitbucket, GitHub and Linear adapters.",
+    "title": "Software Factory Architecture",
+    "summary": "How agents and humans share one software factory: work item lifecycle, gates, claims, reviews, incident fast track, and provider-agnostic ports for Jira, Bitbucket, CI, deployments and alerts.",
     "date": "2026-10-27",
     "updated": "2026-10-27"
   },
