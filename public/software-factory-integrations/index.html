@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Software Factory · Integration Architecture</title>
+<style>
+  :root { --bg: #f4f5f7; --surface: #fff; --line: #d9dde3; --fg: #161a1f; --muted: #5f6873; --accent: #1f5fbf; --code: #eef0f3; --ok: #1e7f4f; --warn: #a15c00; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #121417; --surface: #1b1e23; --line: #2e333b; --fg: #e8eaed; --muted: #9aa0a6; --accent: #8ab4f8; --code: #23272d; --ok: #6fcf97; --warn: #f2b45c; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 56px 16px 96px; }
+  a { color: var(--accent); }
+  .eyebrow { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h2 { font-size: 22px; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 17px; margin: 24px 0 8px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; font-size: 17px; }
+  .meta { color: var(--muted); font-size: 13.5px; margin-bottom: 28px; }
+  .status { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--warn); color: var(--warn); }
+  nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 20px; font-size: 14.5px; }
+  nav.toc ol { margin: 4px 0 0; padding-left: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin: 12px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .grid .card { margin: 0; }
+  .card strong { display: block; font-size: 16px; margin-bottom: 4px; }
+  .card .muted, .muted { color: var(--muted); font-size: 14px; }
+  .tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--code); }
+  .tag.first { outline: 1px solid var(--ok); color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  code { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  .diagram { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+  ol.rules li, ul li { margin-bottom: 6px; }
+  .q { border-left: 3px solid var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">tahmid.dev · Software Factory</div>
+  <h1>Integration Architecture</h1>
+  <p class="lead">How Software Factory talks to version control, issue trackers, CI and docs without being tied to any one vendor.</p>
+  <div class="meta"><span class="status">Draft · for discussion</span> &nbsp; <time datetime="2026-10-27">2026-10-27</time></div>
+
+  <nav class="toc">
+    <strong>Contents</strong>
+    <ol>
+      <li><a href="#context">Context</a></li>
+      <li><a href="#shape">Overall shape</a></li>
+      <li><a href="#ports">Capability ports</a></li>
+      <li><a href="#rules">Design rules</a></li>
+      <li><a href="#model">Domain model</a></li>
+      <li><a href="#traits">Trait sketches</a></li>
+      <li><a href="#layout">Crate layout</a></li>
+      <li><a href="#config">Project bindings</a></li>
+      <li><a href="#plan">First milestone</a></li>
+      <li><a href="#questions">Open questions</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="context">1. Context</h2>
+  <p>Software Factory is a desktop app (Rust + <a href="https://gpui.rs">GPUI</a>) that brings together the work around shipping software: issues, branches, pull requests, CI, docs and the coding agents that act on them.</p>
+  <p>At work the stack is Atlassian (Jira, Bitbucket, Confluence). Elsewhere it might be Linear and GitHub. The app should not care which. It speaks to <strong>generic capabilities</strong>, and each vendor plugs in as an <strong>adapter</strong> (ports and adapters / hexagonal architecture).</p>
+
+  <h2 id="shape">2. Overall shape</h2>
+  <div class="card diagram">┌──────────────────────── software-factory (GPUI app) ────────────────────────┐
+│  Views · state · workflows        depends only on factory-core traits      │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+┌──────────────────────────────── factory-core ───────────────────────────────┐
+│  Ports (traits)   CodeHost · IssueTracker · CiProvider · DocStore ·        │
+│                   Notifier · AgentRuntime                                   │
+│  Domain model     Issue · PullRequest · Pipeline · Page · StatusCategory …  │
+│  Shared           local git ops · ids · errors · capability flags           │
+└───────┬───────────────┬───────────────┬───────────────┬─────────────────────┘
+        │               │               │               │
+  factory-jira   factory-bitbucket  factory-github  factory-linear   … more
+  (IssueTracker) (CodeHost, CI)     (CodeHost, CI)  (IssueTracker)</div>
+  <p class="muted">Dependencies only point inward. Adapters depend on core, the app depends on core, and the core depends on nothing vendor-specific.</p>
+
+  <h2 id="ports">3. Capability ports</h2>
+  <div class="grid">
+    <div class="card"><strong>CodeHost</strong><span class="muted">Repos, branches, pull requests, reviews, review comments.</span>
+      <div class="tags"><span class="tag first">Bitbucket</span><span class="tag">GitHub</span><span class="tag">GitLab</span></div></div>
+    <div class="card"><strong>IssueTracker</strong><span class="muted">Issues, statuses and transitions, comments, links, sprints and cycles.</span>
+      <div class="tags"><span class="tag first">Jira</span><span class="tag">Linear</span><span class="tag">GitHub Issues</span></div></div>
+    <div class="card"><strong>CiProvider</strong><span class="muted">Pipelines, build status per commit or PR, step logs, re-runs.</span>
+      <div class="tags"><span class="tag">Bitbucket Pipelines</span><span class="tag">GitHub Actions</span></div></div>
+    <div class="card"><strong>DocStore</strong><span class="muted">Pages, search, create and update design docs.</span>
+      <div class="tags"><span class="tag">Confluence</span><span class="tag">Notion</span></div></div>
+    <div class="card"><strong>Notifier</strong><span class="muted">Post updates and review requests to people and channels.</span>
+      <div class="tags"><span class="tag">Slack</span></div></div>
+    <div class="card"><strong>AgentRuntime</strong><span class="muted">Run a coding agent on a task in a worktree, stream progress, collect the diff.</span>
+      <div class="tags"><span class="tag">Claude Code</span><span class="tag">Codex</span></div></div>
+  </div>
+  <p><strong>Local git is not a port.</strong> Clone, branch, commit and push work the same way against every host, so they live once in core (via the <code>git</code> CLI or <code>gix</code>). Only the hosting APIs need adapters.</p>
+
+  <h2 id="rules">4. Design rules</h2>
+  <ol class="rules">
+    <li><strong>We own the domain model.</strong> Adapters translate vendor payloads into our types, so Jira or GitHub quirks never reach the UI.</li>
+    <li><strong>Normalised status categories.</strong> Every workflow status maps to a small fixed set. Jira (status categories) and Linear (state types) both already group statuses this way, so the mapping is reliable. The vendor's own status name is kept for display.</li>
+    <li><strong>Capability flags, not lowest common denominator.</strong> Each adapter reports what it supports (sprints, story points, draft PRs, …). The UI shows features when they're available and hides them otherwise, instead of the core pretending every vendor is identical.</li>
+    <li><strong>Provider-qualified IDs.</strong> For example <code>jira:PPL-123</code> or <code>bitbucket:cover42/tenantservice#456</code>. They are opaque to the app and can be resolved back to the right adapter.</li>
+    <li><strong>An escape hatch for vendor-only data.</strong> Each entity carries an optional <code>extra: serde_json::Value</code> for things like Jira custom fields, so adapters don't have to drop them.</li>
+    <li><strong>Async and off the UI thread.</strong> All network calls run on GPUI's background executor, and the UI only ever renders cached state.</li>
+    <li><strong>Fakes from day one.</strong> In-memory fake adapters let the UI and workflows be built and tested without network access or credentials.</li>
+  </ol>
+
+  <h2 id="model">5. Domain model</h2>
+  <h3>Status categories</h3>
+  <table>
+    <tr><th>Category</th><th>Jira status category</th><th>Linear state type</th></tr>
+    <tr><td><code>Backlog</code></td><td>To Do (in backlog)</td><td>backlog</td></tr>
+    <tr><td><code>Todo</code></td><td>To Do</td><td>unstarted</td></tr>
+    <tr><td><code>InProgress</code></td><td>In Progress</td><td>started</td></tr>
+    <tr><td><code>InReview</code></td><td>In Progress, refined by name (e.g. "Code Review")</td><td>started, refined by name</td></tr>
+    <tr><td><code>Done</code></td><td>Done</td><td>completed</td></tr>
+    <tr><td><code>Cancelled</code></td><td>Done, refined by resolution (Won't Do)</td><td>canceled</td></tr>
+  </table>
+  <p class="muted"><code>InReview</code> and <code>Cancelled</code> need a small per-project override map (status name → category), because neither vendor separates them cleanly.</p>
+
+  <h3>Core entities</h3>
+  <table>
+    <tr><th>Entity</th><th>Key fields</th></tr>
+    <tr><td><code>Issue</code></td><td>id, key, title, description (markdown), status {category, name}, assignee, labels, links, url, extra</td></tr>
+    <tr><td><code>PullRequest</code></td><td>id, repo, source → target branch, title, state (open/draft/merged/declined), author, reviewers + approvals, linked issue ids, url</td></tr>
+    <tr><td><code>Pipeline</code></td><td>id, repo, commit, branch, state (pending/running/passed/failed), steps, url</td></tr>
+    <tr><td><code>Comment</code></td><td>id, author, body (markdown), created_at; review comments add file + line</td></tr>
+    <tr><td><code>Person</code></td><td>provider id, display name, email (when available)</td></tr>
+  </table>
+  <p class="muted">Bodies are normalised to Markdown. The Jira adapter converts to and from ADF (Atlassian Document Format).</p>
+
+  <h2 id="traits">6. Trait sketches</h2>
+<pre><code>#[async_trait]
+pub trait IssueTracker: Send + Sync {
+    fn capabilities(&amp;self) -&gt; IssueCapabilities;
+    async fn get_issue(&amp;self, id: &amp;IssueId) -&gt; Result&lt;Issue&gt;;
+    async fn search(&amp;self, query: &amp;IssueQuery) -&gt; Result&lt;Page&lt;Issue&gt;&gt;;
+    async fn comments(&amp;self, id: &amp;IssueId) -&gt; Result&lt;Vec&lt;Comment&gt;&gt;;
+    // writes (milestone 2)
+    async fn transition(&amp;self, id: &amp;IssueId, to: StatusCategory) -&gt; Result&lt;()&gt;;
+    async fn comment(&amp;self, id: &amp;IssueId, body: &amp;str) -&gt; Result&lt;Comment&gt;;
+}
+
+#[async_trait]
+pub trait CodeHost: Send + Sync {
+    fn capabilities(&amp;self) -&gt; CodeHostCapabilities;
+    async fn list_pull_requests(&amp;self, repo: &amp;RepoRef, filter: PrFilter) -&gt; Result&lt;Page&lt;PullRequest&gt;&gt;;
+    async fn get_pull_request(&amp;self, id: &amp;PrId) -&gt; Result&lt;PullRequest&gt;;
+    async fn review_comments(&amp;self, id: &amp;PrId) -&gt; Result&lt;Vec&lt;ReviewComment&gt;&gt;;
+    // writes (milestone 2)
+    async fn open_pull_request(&amp;self, req: NewPullRequest) -&gt; Result&lt;PullRequest&gt;;
+}
+
+pub struct IssueQuery {
+    pub assigned_to_me: bool,
+    pub categories: Vec&lt;StatusCategory&gt;,
+    pub text: Option&lt;String&gt;,
+    pub native: Option&lt;String&gt;, // raw JQL / Linear filter when you need it
+}</code></pre>
+  <p class="muted"><code>IssueQuery::native</code> is the query-side escape hatch. The common filters are portable, and power users can still write JQL.</p>
+
+  <h2 id="layout">7. Crate layout</h2>
+<pre><code>software-factory/            cargo workspace
+├── crates/
+│   ├── factory-core/        ports, domain model, ids, git ops, fakes
+│   ├── factory-jira/        IssueTracker for Jira Cloud (REST v3)
+│   ├── factory-bitbucket/   CodeHost + CiProvider for Bitbucket Cloud (REST 2.0)
+│   ├── factory-github/      (later)
+│   └── factory-linear/      (later, GraphQL)
+└── app/                     GPUI binary: views, state, wiring</code></pre>
+
+  <h2 id="config">8. Project bindings</h2>
+  <p>A <em>project</em> in Software Factory binds each capability to one configured provider instance. Credentials are stored in the macOS Keychain, never in the config file.</p>
+<pre><code># ~/.config/software-factory/projects/emil.toml
+[issues]
+provider = "jira"
+site     = "https://emil-group.atlassian.net"
+projects = ["PPL", "EQ"]
+
+[code]
+provider  = "bitbucket"
+workspace = "cover42"
+
+[status_overrides]
+"Code Review" = "InReview"
+"Won't Do"    = "Cancelled"</code></pre>
+
+  <h2 id="plan">9. First milestone (proposal)</h2>
+  <ol>
+    <li>Convert the repo to a cargo workspace and create <code>factory-core</code> with the model, the traits and fake adapters.</li>
+    <li>Build the <strong>read-only</strong> Jira adapter: my issues, an issue's details, comments.</li>
+    <li>Build the <strong>read-only</strong> Bitbucket adapter: PRs for a repo, PR detail, build status.</li>
+    <li>Make a first GPUI screen: "My work". Issues on the left, the linked PRs and their build status on the right.</li>
+    <li>Then add writes (transition, comment, open PR), and after that the AgentRuntime port.</li>
+  </ol>
+
+  <h2 id="questions">10. Open questions</h2>
+  <div class="card q">Start with Jira and Bitbucket as the first adapters? (Proposed: yes, because they give us real daily data.)</div>
+  <div class="card q">Read-only first, with writes in milestone 2? (Proposed: yes.)</div>
+  <div class="card q">Link issues and PRs by Jira key in the branch name or PR title (e.g. <code>PPL-123</code>), as Atlassian already does? Or keep our own link store as well?</div>
+  <div class="card q">Should the app keep a local cache (SQLite) so it works offline and loads instantly, or always fetch live at first?</div>
+  <div class="card q">Is the factory's core loop "issue → agent works in a worktree → PR → review → merge", with the integrations serving that loop? That would make AgentRuntime the next port after the read-only adapters.</div>
+</main>
+</body>
+</html>

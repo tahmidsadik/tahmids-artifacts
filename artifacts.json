@@ -1,5 +1,12 @@
 [
   {
+    "slug": "software-factory-integrations",
+    "title": "Software Factory Integrations",
+    "summary": "Provider-agnostic integration architecture for Software Factory: capability ports (code hosting, issue tracking, CI, docs, agents) with Jira, Bitbucket, GitHub and Linear adapters.",
+    "date": "2026-10-27",
+    "updated": "2026-10-27"
+  },
+  {
     "slug": "product-document-versions",
     "title": "Product Document Versions",
     "summary": "Why customers receive the wrong product-document versions, with real test and staging data, a simulator and proposed fixes.",
