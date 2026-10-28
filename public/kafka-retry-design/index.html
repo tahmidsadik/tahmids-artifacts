@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka Retry Design</title>
+<meta name="description" content="Design proposal for bounded retries, delay tiers and per-service dead-letter topics for Kafka consumers in @emilgroup/core.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Same tokens and diagram classes as the Kafka Retry Diagrams page, with prose styles for a long read. */
+/* Layout: an engineering review sheet. Sticky figure index on the left, one claim per figure on the right. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --fg: #141a21;
+  --muted: #586473;
+  --rule: #d9dee4;
+  --line: #8c96a3;
+  --accent: #0a6f6a;
+  --good: #1d7f46;
+  --bad: #c0362c;
+  --warn: #a8670d;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+    --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+  --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 48px;
+}
+@media (max-width: 960px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } .toc { position: static !important; } }
+
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13.5px; }
+.toc h2 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a { display: grid; grid-template-columns: 34px 1fr; padding: 5px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+.toc a span { color: var(--muted); font-family: var(--font-mono); font-size: 12px; padding-top: 1px; }
+.toc a:hover, .toc a:focus-visible { background: var(--surface); outline: none; box-shadow: inset 0 0 0 1px var(--rule); }
+.toc .group { margin: 14px 0 4px 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+main { min-width: 0; display: grid; gap: 56px; }
+header h1 { font: 700 clamp(28px, 4vw, 40px)/1.1 var(--font-display); letter-spacing: -.01em; margin: 0 0 12px; text-wrap: balance; }
+header p { margin: 0; max-width: 66ch; color: var(--muted); }
+header p + p { margin-top: 8px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, .mono { font-family: var(--font-mono); font-size: .9em; }
+
+.decisions { margin-top: 24px; border: 1px solid var(--rule); background: var(--surface); border-radius: 10px; padding: 18px 20px; }
+.decisions h2 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.decisions ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+.part-label { font: 600 11px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 -36px; }
+
+section.fig { display: grid; gap: 14px; scroll-margin-top: 24px; }
+main > *, section.fig > * { min-width: 0; }
+.fig .eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.fig h3 { font: 600 22px/1.25 var(--font-display); margin: 0; text-wrap: balance; max-width: 40ch; }
+.fig > p { margin: 0; max-width: 70ch; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+.scroll { overflow-x: auto; padding: 20px; }
+figcaption { border-top: 1px solid var(--rule); padding: 12px 20px; font-size: 13.5px; color: var(--muted); }
+.review { font-size: 13.5px; border-left: 2px solid var(--warn); padding: 2px 0 2px 12px; max-width: 70ch; }
+.review b { color: var(--warn); font-weight: 600; }
+
+/* Diagram drawing classes */
+svg.dg { display: block; width: 100%; height: auto; min-width: 700px; font-family: var(--font-body); }
+.dg text { fill: var(--fg); font-size: 13px; }
+.dg text.s { font-size: 11.5px; fill: var(--muted); }
+.dg text.m { font-family: var(--font-mono); font-size: 12px; }
+.dg text.ms { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.dg text.b { font-weight: 600; }
+.dg text.tbad { fill: var(--bad); }
+.dg text.tgood { fill: var(--good); }
+.dg text.tacc { fill: var(--accent); }
+.dg text.cap { font-size: 10.5px; letter-spacing: .08em; fill: var(--muted); }
+.dg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+.dg .dim { fill: var(--bg); stroke: var(--rule); stroke-width: 1.25; }
+.dg .badbox { fill: color-mix(in srgb, var(--bad) 13%, var(--surface)); stroke: var(--bad); stroke-width: 1.75; }
+.dg .goodbox { fill: color-mix(in srgb, var(--good) 13%, var(--surface)); stroke: var(--good); stroke-width: 1.5; }
+.dg .warnbox { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); stroke-width: 1.5; }
+.dg .accbox { fill: color-mix(in srgb, var(--accent) 12%, var(--surface)); stroke: var(--accent); stroke-width: 1.75; }
+.dg .band-acc { fill: color-mix(in srgb, var(--accent) 7%, transparent); }
+.dg .ln { fill: none; stroke: var(--line); stroke-width: 1.25; }
+.dg .ln-bad { fill: none; stroke: var(--bad); stroke-width: 1.5; }
+.dg .ln-acc { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.dg .life { stroke: var(--rule); stroke-width: 1.25; stroke-dasharray: 4 5; }
+.dg .rule { stroke: var(--rule); stroke-width: 1; }
+.dg .dash { stroke-dasharray: 5 4; }
+.dg .mk { fill: var(--line); }
+.dg .mk-bad { fill: var(--bad); }
+.dg .mk-acc { fill: var(--accent); }
+.dg .dot-acc { fill: var(--accent); }
+.dg .dot-hollow { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }
+.dg .sw-good { fill: color-mix(in srgb, var(--good) 13%, var(--surface)); stroke: var(--good); }
+.dg .sw-bad { fill: color-mix(in srgb, var(--bad) 13%, var(--surface)); stroke: var(--bad); }
+.dg .sw-dim { fill: var(--bg); stroke: var(--rule); }
+.dg .sw-warn { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); }
+
+
+body { margin: 0; }
+.wrap { max-width: 1120px; grid-template-columns: 230px minmax(0, 1fr); }
+@media (max-width: 960px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+.toc li.h3 a { padding-left: 22px; color: var(--muted); font-size: 13px; }
+.toc a { grid-template-columns: 1fr; }
+@media (max-width: 960px) { .toc li.h3 { display: none; } }
+main { gap: 0; max-width: 820px; }
+header { padding-bottom: 28px; border-bottom: 1px solid var(--rule); margin-bottom: 8px; }
+.meta { font-size: 13.5px; color: var(--muted); margin-top: 12px !important; }
+.meta .status { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); font-size: 12px; margin-left: 4px; }
+.companion { margin-top: 20px; display: flex; gap: 14px; align-items: center; border: 1px solid var(--rule); background: var(--surface); border-radius: 10px; padding: 14px 18px; text-decoration: none; color: var(--fg); }
+.companion:hover { border-color: var(--accent); }
+.companion b { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.companion span { color: var(--muted); font-size: 13.5px; }
+section.doc { padding: 28px 0 8px; }
+section.doc h2 { font: 700 26px/1.2 var(--font-display); margin: 0 0 14px; scroll-margin-top: 24px; text-wrap: balance; }
+section.doc h3 { font: 600 18px/1.3 var(--font-display); margin: 30px 0 10px; scroll-margin-top: 24px; }
+section.doc p, section.doc li { max-width: 72ch; }
+section.doc p { margin: 0 0 14px; }
+section.doc ul, section.doc ol { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 6px; }
+section.doc code { background: color-mix(in srgb, var(--fg) 6%, transparent); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+section.doc pre { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
+section.doc pre code { background: none; padding: 0; overflow-wrap: normal; }
+section.doc figure { margin: 8px 0 18px; }
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); margin: 0 0 18px; }
+.tbl table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 620px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl th { font: 600 11px/1.3 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+.tbl td code { font-size: 12px; }
+#options-considered ~ .tbl tr:last-child td, .tbl tr:has(strong) td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.task-list, ul:has(.box-q) { list-style: none; padding-left: 0 !important; }
+.box-q { display: inline-block; width: 13px; height: 13px; border: 1.5px solid var(--line); border-radius: 3px; margin-right: 10px; vertical-align: -1px; }
+ul:has(.box-q) label { display: block; }
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li class="h2"><a href="#summary">Summary</a></li><li class="h2"><a href="#current-state">Current state</a></li><li class="h2"><a href="#goals-and-non-goals">Goals and non-goals</a></li><li class="h2"><a href="#options-considered">Options considered</a></li><li class="h2"><a href="#proposed-design">Proposed design</a></li><li class="h3"><a href="#topology-per-consumer-group-not-per-topic">Topology: per consumer group, not per topic</a></li><li class="h3"><a href="#message-lifecycle">Message lifecycle</a></li><li class="h3"><a href="#error-classification">Error classification</a></li><li class="h3"><a href="#headers-added-on-retry-and-dlq">Headers added on retry and DLQ</a></li><li class="h3"><a href="#ordering">Ordering</a></li><li class="h3"><a href="#idempotency-contract">Idempotency contract</a></li><li class="h3"><a href="#redrive-tooling">Redrive tooling</a></li><li class="h2"><a href="#api-and-per-service-configuration">API and per-service configuration</a></li><li class="h2"><a href="#observability-and-operations">Observability and operations</a></li><li class="h2"><a href="#rollout-and-migration">Rollout and migration</a></li><li class="h2"><a href="#risks-and-open-questions">Risks and open questions</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header>
+      <h1>Message retry and dead-letter handling</h1>
+      <p>Design proposal for Kafka consumers in <code>@emilgroup/core</code>.</p>
+      <p class="meta">27 Oct 2026 · Tahmid Sadik <span class="status">Draft for review</span></p>
+      <a class="companion" href="https://artifacts.tahmid.dev/kafka-retry-diagrams/"><b>Diagrams →</b><span>Nine figures that walk through this proposal, from today's lost-error path to the rollout gates.</span></a>
+    </header>
+<section class="doc"><h2 id="summary">Summary</h2>
+<p>Kafka consumers built on <code>@emilgroup/core</code> never retry and
+never dead-letter: every handler exception is swallowed inside NestJS,
+the offset is committed, and the message is lost. The <code>.dlq</code>
+topics we auto-create are never written to.</p>
+<p>This proposal fixes the error path and adds a bounded, non-blocking
+retry pipeline owned by core: a few fast in-process retries, then
+delayed retries through per-service retry topics, then a per-service DLQ
+with full failure context and a redrive tool. Services opt in with one
+decorator option; rollout is in four phases, with a no-behaviour-change
+visibility fix first.</p>
+<p><strong>Decisions asked of reviewers:</strong> per-service (consumer
+group) DLQ instead of per-topic DLQ; at-least-once with idempotent
+handlers as the contract; non-blocking retries by default, strict
+ordering as opt-in.</p>
+</section>
+<section class="doc"><h2 id="current-state">Current state</h2>
+<p>A failing <code>@KafkaMessageHandler</code> today is logged once as a
+generic <code>Internal server error</code> and then committed as if it
+succeeded. Verified against <code>@emilgroup/core</code> 11.46.0,
+<code>@nestjs/microservices</code> 11.1.24 and
+<code>@confluentinc/kafka-javascript</code> 1.8.2.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Finding</th>
+<th>Where</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1</td>
+<td>Handler errors never reach the consumer. NestJS's
+<code>RpcProxy</code> catches the exception, the RPC exception filter
+turns it into a <code>throwError</code> Observable, and
+<code>Server.handleEvent</code> connects that Observable to a
+<code>Subject</code> with no subscribers. The error goes nowhere
+(reproduced with a 5-line rxjs script).</td>
+<td><code>kafka-consumer.service.ts</code> calls
+<code>server.handleEvent(...)</code>;
+<code>@nestjs/microservices/server/server.js</code>
+<code>handleEvent</code></td>
+<td><code>eachMessage</code> resolves, the offset is stored, the message
+is lost. Only trace: one <code>RpcExceptionsHandler</code> log line,
+original error class gone.</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>With <code>TRACING_ENABLED=true</code> the tracing wrapper catches
+handler errors and does not rethrow. The workflow variant does
+rethrow.</td>
+<td><code>tracing/trace-injector.ts</code>
+<code>injectTracingToQueueConsumer</code> (used by both
+<code>KafkaMessageHandler</code> and the SQS
+<code>QueueMessageHandler</code>)</td>
+<td>A second, independent swallow. Also silently breaks SQS redelivery
+in traced environments.</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>If F1 and F2 were fixed alone, the confluent client would seek back
+to the failed offset and re-run the message immediately, forever. The
+client <code>retry</code> option only covers broker calls, not handler
+failures.</td>
+<td><code>@confluentinc/kafka-javascript</code>
+<code>_consumer.js</code> <code>#messageProcessor</code></td>
+<td>One poison message blocks its whole partition with a hot loop and no
+backoff.</td>
+</tr>
+<tr>
+<td>F4</td>
+<td>Unparseable JSON, empty values and a missing event type are logged
+and dropped with <code>return</code>.</td>
+<td><code>kafka-consumer.service.ts</code> <code>eachMessage</code></td>
+<td>Malformed messages vanish without a DLQ record.</td>
+</tr>
+<tr>
+<td>F5</td>
+<td><code>.dlq</code> topics are auto-created (1 partition, same
+retention as the source), but nothing in core writes to them. The docs
+tell services to produce to them by hand.</td>
+<td><code>ensureTopics()</code>,
+<code>docs/auto-create-kafka-topics.md</code></td>
+<td>No standard headers, no redrive, and a per-<em>topic</em> DLQ is
+shared by every consumer group of that topic.</td>
+</tr>
+<tr>
+<td>F6</td>
+<td>No metrics for handler failures, retries or DLQ volume.</td>
+<td>Kafka module</td>
+<td>Loss is invisible until someone notices missing data
+downstream.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Contrast with SQS.</strong> The SQS consumer awaits the
+handler's Observable with <code>firstValueFrom</code>, so errors
+propagate and SQS visibility timeout plus redrive policy work as
+intended (apart from F2). The Kafka transport is the outlier; this
+design brings it to parity and beyond.</p>
+</section>
+<section class="doc"><h2 id="goals-and-non-goals">Goals and non-goals</h2>
+<p><strong>Goals</strong></p>
+<ul>
+<li>No silent loss: every message either succeeds, is retried, or lands
+in a DLQ with enough context to act on it.</li>
+<li>Bounded retries with backoff, configurable per handler, with sane
+defaults.</li>
+<li>A poison message must not block its partition for longer than the
+inline retry budget (seconds, not hours).</li>
+<li>Retries and redrives affect only the consumer that failed, never
+other services consuming the same topic.</li>
+<li>A supported way to inspect, redrive and discard dead-lettered
+messages.</li>
+<li>Metrics and alerts for failures, retries and DLQ growth.</li>
+<li>Opt-in first, so each service can adopt it after checking its
+handlers are idempotent.</li>
+</ul>
+<p><strong>Non-goals</strong></p>
+<ul>
+<li>Exactly-once processing. The contract stays at-least-once; handlers
+must be idempotent.</li>
+<li>Retries for Zeebe/Camunda workers (<code>workflow</code> module
+already has <code>RetryableWorkerError</code> and a backoff
+executor).</li>
+<li>Changing the producer side or topic schemas.</li>
+<li>Automatic replay of messages already lost before rollout.</li>
+</ul>
+</section>
+<section class="doc"><h2 id="options-considered">Options considered</h2>
+<p>Option D, a hybrid of short in-process retries and a small set of
+fixed-delay retry topics, is recommended: it is the only option that
+both rides out outages lasting minutes and keeps a poison message from
+blocking its partition.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>How it works</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. Blocking in-process retry, then DLQ</td>
+<td>Fix error propagation; retry the handler N times with backoff inside
+<code>eachMessage</code>; on exhaustion publish to DLQ and commit.</td>
+<td>Smallest change. Preserves per-partition order. No new topics beyond
+DLQ.</td>
+<td>Partition is blocked during backoff. Total budget must stay well
+under <code>max.poll.interval.ms</code> (300 s default), so it cannot
+ride out a 10-minute downstream outage.</td>
+</tr>
+<tr>
+<td>B. Retry-topic chain only (Spring Kafka / Uber style)</td>
+<td>Every failure goes straight to a delay-tier topic; each tier
+consumer waits until due.</td>
+<td>Non-blocking. Long delays possible. Well-known pattern.</td>
+<td>Even a 50 ms blip costs a round trip through Kafka and a fixed
+delay. Breaks per-key ordering on every failure.</td>
+</tr>
+<tr>
+<td>C. Database-backed retry</td>
+<td>Persist failed messages in a service table; a scheduler
+re-dispatches.</td>
+<td>Queryable, easy manual edits.</td>
+<td>Needs a table and scheduler in every service, multi-tenant
+connection handling, and duplicates what Kafka already offers.</td>
+</tr>
+<tr>
+<td><strong>D. Hybrid (recommended)</strong></td>
+<td>A for 3 fast attempts (about 2 s total); then B with few tiers
+(default 1 min and 10 min, one topic each); after the last tier,
+DLQ.</td>
+<td>Transient blips never leave the partition. Non-blocking after about
+2 s. Covers outages of 10+ minutes. 3 extra topics per service. Redrive
+reuses the retry path.</td>
+<td>Breaks per-key ordering once a message leaves the inline stage
+(strict-order handlers opt out, see design). Tier consumers need
+pause/resume logic.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Each retry topic carries exactly one delay. Because all messages in a
+tier wait the same time and are appended in failure order, the head of
+each partition is always the next one due, so a tier consumer can simply
+pause the partition until the head is due. Mixing delays in one topic
+would let a 10-minute message block a 1-minute one behind it, which is
+why tiers are separate topics.</p>
+</section>
+<section class="doc"><h2 id="proposed-design">Proposed design</h2>
+<p>Every failed message moves through three stages owned by core: inline
+retries, fixed-delay retry tiers, and a per-service DLQ. Handlers stay
+unchanged apart from one decorator option.</p>
+<h3 id="topology-per-consumer-group-not-per-topic">Topology: per
+consumer group, not per topic</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Partitions</th>
+<th>Retention</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;groupId&gt;.retry.1m</code></td>
+<td>3</td>
+<td>7 days</td>
+<td>First delay tier</td>
+</tr>
+<tr>
+<td><code>&lt;groupId&gt;.retry.10m</code></td>
+<td>3</td>
+<td>7 days</td>
+<td>Second delay tier</td>
+</tr>
+<tr>
+<td><code>&lt;groupId&gt;.dlq</code></td>
+<td>1</td>
+<td>30 days</td>
+<td>Exhausted or non-retryable messages</td>
+</tr>
+</tbody>
+</table></div>
+<p>Tiers are configurable per service; the table shows the default. The
+existing <code>&lt;topic&gt;.dlq</code> is shared by every consumer
+group of that topic, so redriving into it, or into the source topic,
+would re-deliver to every service. Per-group topics carry the source
+topic in headers and dispatch straight back to the handler that failed.
+Existing <code>&lt;topic&gt;.dlq</code> topics are left in place and
+deprecated (see Rollout).</p>
+<h3 id="message-lifecycle">Message lifecycle</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 760 448" role="img" aria-label="Flow: source topic to handler. Success commits. Non-retryable failures go to the DLQ. Retryable failures retry inline three times, then go to retry tiers, which feed the handler again when due. After the last tier the message goes to the DLQ, from where it can be redriven to the tiers.">
+            <defs>
+              <marker id="f4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+              <marker id="f4c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-acc"/></marker>
+            </defs>
+            <g class="ln">
+              <path class="ln" d="M155 96H235" marker-end="url(#f4a)"/>
+              <path class="ln" d="M385 96H436" marker-end="url(#f4a)"/>
+              <path class="ln" d="M564 96H595" marker-end="url(#f4a)"/>
+              <path class="ln" d="M500 132V180" marker-end="url(#f4a)"/>
+              <path class="ln" d="M436 216H395" marker-end="url(#f4a)"/>
+              <path class="ln" d="M310 188V120" marker-end="url(#f4a)"/>
+              <path class="ln" d="M564 216H665V308" marker-end="url(#f4a)"/>
+              <path class="ln" d="M310 244V300" marker-end="url(#f4a)"/>
+              <path class="ln" d="M405 336H595" marker-end="url(#f4a)"/>
+              <path class="ln" d="M215 336H185V110H235" marker-end="url(#f4a)"/>
+              <path class="ln-acc dash" d="M665 364V420H310V372" marker-end="url(#f4c)"/>
+            </g>
+            <rect class="box" x="25" y="72" width="130" height="48" rx="8"/><text x="90" y="100" text-anchor="middle">Source topic</text>
+            <rect class="box" x="235" y="72" width="150" height="48" rx="8"/><text class="b" x="310" y="100" text-anchor="middle">Handler</text>
+            <polygon class="box" points="436,96 500,60 564,96 500,132"/><text x="500" y="100" text-anchor="middle">Succeeded?</text>
+            <rect class="goodbox" x="595" y="72" width="140" height="48" rx="8"/><text class="b" x="665" y="100" text-anchor="middle">Commit offset</text>
+            <polygon class="box" points="436,216 500,180 564,216 500,252"/><text x="500" y="220" text-anchor="middle">Retryable?</text>
+            <rect class="warnbox" x="225" y="188" width="170" height="56" rx="8"/>
+            <text class="b" x="310" y="211" text-anchor="middle">Inline retry</text>
+            <text class="s" x="310" y="231" text-anchor="middle">3 attempts, ~2.6 s</text>
+            <rect class="accbox" x="215" y="300" width="190" height="72" rx="8"/>
+            <text class="b" x="310" y="322" text-anchor="middle">Retry tiers</text>
+            <text class="ms" x="310" y="342" text-anchor="middle">&lt;group&gt;.retry.1m</text>
+            <text class="ms" x="310" y="358" text-anchor="middle">&lt;group&gt;.retry.10m</text>
+            <rect class="badbox" x="595" y="308" width="140" height="56" rx="8"/>
+            <text class="m b" x="665" y="331" text-anchor="middle">&lt;group&gt;.dlq</text>
+            <text class="s" x="665" y="351" text-anchor="middle">alert fires</text>
+            <text class="s" x="580" y="88" text-anchor="middle">yes</text>
+            <text class="s" x="508" y="162">no</text>
+            <text class="s" x="415" y="208" text-anchor="middle">yes</text>
+            <text class="s" x="615" y="208" text-anchor="middle">no</text>
+            <text class="s" x="318" y="160">retry in place</text>
+            <text class="s" x="318" y="278">attempts used up</text>
+            <text class="s" x="500" y="326" text-anchor="middle">last tier used up</text>
+            <text class="s" x="177" y="230" text-anchor="end">when due</text>
+            <text class="s tacc" x="487" y="412" text-anchor="middle">redrive (CLI, manual)</text>
+          </svg>
+        </div>
+        <figcaption>Each tier attempt runs the same handler with the same inline retries. Malformed messages (bad JSON, no event type) skip straight to the DLQ instead of being dropped. Non-retryable: <code>NonRetryableKafkaError</code>, 400 and 422 exceptions, validation errors.</figcaption>
+      </figure>
+<p>Each tier attempt goes back through the same handler and the same
+inline retries; malformed messages skip straight to the DLQ.</p>
+<ol type="1">
+<li><strong>Dispatch and await.</strong>
+<code>KafkaConsumerServer</code> overrides <code>handleEvent</code> to
+await the handler's Observable (<code>lastValueFrom</code>), as the SQS
+transport already does. A Kafka-only exception filter rethrows the
+original error so its class survives. This fixes F1. The tracing wrapper
+rethrows after recording the span (F2).</li>
+<li><strong>Success</strong> → offset is stored, as today.</li>
+<li><strong>Failure</strong> → classify the error (below). Non-retryable
+goes straight to the DLQ.</li>
+<li><strong>Inline retries.</strong> Up to 3 attempts with exponential
+backoff and jitter (200 ms, 600 ms, 1.8 s; about 2.6 s worst case). The
+partition waits only this long.</li>
+<li><strong>Escalate to a tier.</strong> Publish a copy to the next tier
+topic with retry headers, await the broker ack, then let the offset
+commit. If the publish fails, the error is thrown so the client seeks
+back and the message is retried later: never lost, possibly
+duplicated.</li>
+<li><strong>Tier consumer.</strong> One extra consumer per service
+(group <code>&lt;groupId&gt;.retry</code>) reads all its tier topics. If
+a partition's head is not yet due (<code>x-retry-not-before</code>), it
+pauses that partition and resumes at the due time. When due, it
+dispatches to the handler named by <code>x-original-topic</code> +
+<code>x-event-type</code>, with the same inline retries.</li>
+<li><strong>Exhausted</strong> after the last tier → DLQ, offset
+commits, an alert fires.</li>
+<li><strong>Malformed input</strong> (bad JSON, empty value, no event
+type; F4) → DLQ with <code>x-error-class: MalformedMessage</code>
+instead of being dropped.</li>
+</ol>
+<h3 id="error-classification">Error classification</h3>
+<ul>
+<li>New export <code>NonRetryableKafkaError</code>: throw it (or wrap a
+cause in it) to skip retries.</li>
+<li>Non-retryable by default: <code>MalformedMessage</code>,
+<code>BadRequestException</code>,
+<code>UnprocessableEntityException</code>, class-validator validation
+errors.</li>
+<li>Retryable by default: everything else, including timeouts, gRPC
+<code>UNAVAILABLE</code>, DB connection errors and
+<code>NotFoundException</code> (often eventual consistency; see open
+questions).</li>
+<li>Per-handler override:
+<code>retry.isRetryable(error) =&gt; boolean</code>.</li>
+</ul>
+<h3 id="headers-added-on-retry-and-dlq">Headers added on retry and
+DLQ</h3>
+<p>All original headers are kept (<code>x-tenant-slug</code>,
+<code>x-correlation-id</code>, <code>x-user-id</code>,
+<code>x-event-type</code>, …). Core adds:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x-original-topic</code> / <code>-partition</code> /
+<code>-offset</code></td>
+<td><code>eis.account.events</code> / <code>2</code> /
+<code>18734</code></td>
+<td>Together form the stable message id used for dedup</td>
+</tr>
+<tr>
+<td><code>x-original-timestamp</code></td>
+<td><code>1761552000000</code></td>
+<td>First produce time</td>
+</tr>
+<tr>
+<td><code>x-consumer-group</code></td>
+<td><code>accountservice</code></td>
+<td>Group that failed</td>
+</tr>
+<tr>
+<td><code>x-retry-attempt</code></td>
+<td><code>4</code></td>
+<td>Total attempts so far, inline included</td>
+</tr>
+<tr>
+<td><code>x-retry-tier</code></td>
+<td><code>retry.1m</code></td>
+<td>Tier the message is in</td>
+</tr>
+<tr>
+<td><code>x-retry-not-before</code></td>
+<td><code>1761552060000</code></td>
+<td>Epoch ms; tier consumer waits until then</td>
+</tr>
+<tr>
+<td><code>x-error-class</code></td>
+<td><code>QueryFailedError</code></td>
+<td>Last error's constructor name</td>
+</tr>
+<tr>
+<td><code>x-error-message</code></td>
+<td><code>connect ECONNREFUSED …</code></td>
+<td>Truncated to 1 KB, no stack</td>
+</tr>
+<tr>
+<td><code>x-failed-at</code></td>
+<td><code>1761552001200</code></td>
+<td>Time of the last failure</td>
+</tr>
+<tr>
+<td><code>x-redriven-at</code> / <code>x-redriven-by</code></td>
+<td><code>…</code> / <code>&lt;user sub&gt;</code></td>
+<td>Set only by the redrive tool</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ordering">Ordering</h3>
+<p>Default mode is non-blocking: once a message leaves the inline stage,
+newer messages with the same key can be processed before it. Handlers
+that need per-key order (for example balance updates) set
+<code>ordering: 'strict'</code>: inline retries continue in place with
+backoff capped at 30 s for up to 4 minutes (inside
+<code>max.poll.interval.ms</code>), then the message goes to the DLQ and
+the partition continues, or, with <code>onExhausted: 'pause'</code>, the
+partition stays paused until someone redrives or discards it.</p>
+<h3 id="idempotency-contract">Idempotency contract</h3>
+<p>Retries and redrives make duplicates normal. Core exposes the stable
+id <code>&lt;original-topic&gt;:&lt;partition&gt;:&lt;offset&gt;</code>
+via a new <code>@KafkaMessageMeta()</code> parameter decorator so
+handlers can dedupe. <code>IdempotencyManager</code> gets a
+<code>runWithMessageIdempotency(meta, work)</code> method mirroring the
+existing <code>runWithJobIdempotency</code> for Zeebe jobs. Adopting
+retry on a handler requires confirming it is idempotent; this is the
+main per-service checklist item.</p>
+<h3 id="redrive-tooling">Redrive tooling</h3>
+<ul>
+<li><code>KafkaDlqService</code> (core): <code>list(filter)</code>,
+<code>redrive(filter)</code>, <code>discard(filter)</code>. Filters:
+event type, tenant, error class, time range, offsets.</li>
+<li>Redrive publishes to the first tier with
+<code>x-retry-attempt</code> reset and <code>x-redriven-*</code> set; it
+never writes to the source topic, so only the failing service sees the
+message again. Discarding commits past the message in a dedicated
+<code>&lt;groupId&gt;.dlq-admin</code> group, keeping an audit log
+line.</li>
+<li>Exposed as an internal, platform-admin-only REST endpoint registered
+by <code>KafkaModule</code> and as an <code>eis kafka dlq</code> CLI
+command that calls it.</li>
+</ul>
+</section>
+<section class="doc"><h2 id="api-and-per-service-configuration">API and per-service
+configuration</h2>
+<p>A service turns the pipeline on once in <code>KafkaModule</code>
+config and tunes it per handler; all new fields are optional, so this
+ships as a <code>minor</code> release.</p>
+<p><strong>Module level</strong> (new <code>consumerRetry</code> block
+in <code>ConfigParams</code>):</p>
+<pre class="ts"><code>KafkaModule.register({
+  kafka: kafkaOptions,
+  topicConfigs,
+  consumerRetry: {
+    enabled: true,                    // default false until Phase 4
+    inline: { attempts: 3, initialDelayMs: 200, multiplier: 3, jitter: true },
+    tiers: [&#39;1m&#39;, &#39;10m&#39;],             // one topic per entry: &lt;groupId&gt;.retry.1m, .retry.10m
+    dlq: { retentionMs: RetentionMs.ThirtyDays },
+    redriveEndpoint: true,            // registers the platform-admin DLQ endpoint
+  },
+});</code></pre>
+<p><strong>Handler level</strong> (optional third argument to the
+existing decorator):</p>
+<pre class="ts"><code>@KafkaMessageHandler(ACCOUNT_DOMAIN_TOPIC, &#39;account.created&#39;, {
+  retry: { tiers: [&#39;1m&#39;, &#39;10m&#39;, &#39;10m&#39;], isRetryable: (e) =&gt; !(e instanceof DuplicateAccountError) },
+})
+async onAccountCreated(@Payload() data: AccountCreated, @KafkaMessageMeta() meta: KafkaMessageMeta) {
+  await this.idempotency.runWithMessageIdempotency(meta, () =&gt; this.syncAccount(data)); // new, mirrors runWithJobIdempotency
+}
+
+@KafkaMessageHandler(BILLING_DOMAIN_TOPIC, &#39;invoice.paid&#39;, { ordering: &#39;strict&#39;, onExhausted: &#39;pause&#39; })
+async onInvoicePaid(@Payload() data: InvoicePaid) { /* ... */ }
+
+@KafkaMessageHandler(AUDIT_DOMAIN_TOPIC, &#39;audit.logged&#39;, { retry: false }) // DLQ on first failure</code></pre>
+<p>A handler's <code>tiers</code> may repeat or skip entries of the
+module's tier list but cannot add new delays, since each delay is a
+topic.</p>
+<p><strong>New exports</strong> (all additive):
+<code>NonRetryableKafkaError</code>, <code>KafkaMessageMeta</code>
+(decorator + type with <code>messageId</code>, <code>attempt</code>,
+<code>originalTopic</code>, <code>isRedrive</code>),
+<code>KafkaDlqService</code>, <code>KafkaRetryHeaderKeys</code>,
+<code>KafkaHandlerOptions</code>.</p>
+<p><strong>Topic creation.</strong> <code>ensureTopics()</code> creates
+the tier and DLQ topics for the consumer group when
+<code>consumerRetry.enabled</code> is true, independent of
+<code>topicConfigs</code> (which only lists topics the service
+produces). In environments where services lack create-topic ACLs, the
+topics are added to the platform topic list instead (open question).</p>
+</section>
+<section class="doc"><h2 id="observability-and-operations">Observability and operations</h2>
+<p>A message reaching a DLQ pages nobody but always raises a
+ticket-level alert; a growing retry backlog is the early warning.</p>
+<p><strong>Metrics</strong> (OpenTelemetry, labels
+<code>consumer_group</code>, <code>topic</code>,
+<code>event_type</code>, <code>error_class</code>):</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Alert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kafka_consumer_handler_failures_total</code></td>
+<td>counter</td>
+<td>none; dashboards only</td>
+</tr>
+<tr>
+<td><code>kafka_consumer_retries_total</code> (+ <code>stage</code> =
+inline / tier)</td>
+<td>counter</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>kafka_consumer_dlq_total</code></td>
+<td>counter</td>
+<td>any increase in 5 min → warning to the owning team's channel</td>
+</tr>
+<tr>
+<td><code>kafka_consumer_retry_backlog</code></td>
+<td>gauge, messages not yet due per tier</td>
+<td>above a per-service threshold for 15 min → warning</td>
+</tr>
+<tr>
+<td><code>kafka_consumer_dlq_publish_failures_total</code></td>
+<td>counter</td>
+<td>any increase → critical (messages are looping)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Logs.</strong> One structured <code>error</code> line per
+failure with <code>correlationId</code>, <code>tenantSlug</code>,
+message id, attempt, tier and error class. Inline attempts before the
+last log at <code>warn</code>.</p>
+<p><strong>Tracing.</strong> Each attempt is a span on the original
+trace with <code>messaging.retry.attempt</code>; the tracing wrapper
+records the exception and rethrows.</p>
+<p><strong>Runbook (per DLQ alert)</strong></p>
+<ol type="1">
+<li><code>eis kafka dlq list &lt;service&gt; --since 1h</code> to group
+entries by event type and error class.</li>
+<li>Fix the cause (deploy, data fix, downstream recovery).</li>
+<li><code>eis kafka dlq redrive &lt;service&gt; --event &lt;type&gt; --since &lt;time&gt;</code>;
+watch <code>kafka_consumer_dlq_total</code> stay flat.</li>
+<li>Messages that should never be processed:
+<code>eis kafka dlq discard …</code> with a reason, which is logged for
+audit.</li>
+</ol>
+<p><strong>Data protection.</strong> DLQ messages keep the original
+payload and headers, including <code>x-api-key</code> and personal data.
+DLQ topics get the same ACLs as the source topics, the CLI masks
+<code>x-api-key</code>, and retention is capped at 30 days.</p>
+</section>
+<section class="doc"><h2 id="rollout-and-migration">Rollout and migration</h2>
+<p>Rollout runs in four phases; only Phase 4 changes default behaviour,
+and it is a <code>major</code> release. Phase 1 ships the propagation
+fix and bounded retries together on purpose: fixing error propagation
+(F1) without bounded retries turns every poison message into an infinite
+hot loop (F3).</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Ships</th>
+<th>core version</th>
+<th>Behaviour change</th>
+<th>Exit gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Visibility</td>
+<td>Log the real error class and message for swallowed Kafka handler
+errors; add <code>kafka_consumer_handler_failures_total</code>.</td>
+<td>patch</td>
+<td>None</td>
+<td>One week of failure counts per service, so we know how much is being
+lost today.</td>
+</tr>
+<tr>
+<td>1. Retry + DLQ, opt-in</td>
+<td>F1 fix behind <code>consumerRetry.enabled</code>; inline retries;
+per-group DLQ; F4 malformed messages to DLQ; F2 rethrow scoped to Kafka;
+<code>KafkaMessageMeta</code>; DLQ metrics.</td>
+<td>minor</td>
+<td>Only for services that opt in</td>
+<td>One pilot service runs 2 weeks in TEST and 1 week in production with
+zero lost messages and no partition stalls.</td>
+</tr>
+<tr>
+<td>2. Delay tiers + redrive</td>
+<td>Tier topics and tier consumer; <code>KafkaDlqService</code>; admin
+endpoint; <code>eis kafka dlq</code> CLI; alerts.</td>
+<td>minor</td>
+<td>Only for opted-in services</td>
+<td>Pilot redrives a real DLQ batch end to end; runbook reviewed by
+on-call.</td>
+</tr>
+<tr>
+<td>3. Adoption</td>
+<td>Each team confirms handler idempotency, enables
+<code>consumerRetry</code>, sets strict ordering where needed.</td>
+<td>service PRs</td>
+<td>Per service</td>
+<td>All Kafka-consuming services enabled.</td>
+</tr>
+<tr>
+<td>4. Default on</td>
+<td><code>consumerRetry.enabled</code> defaults to true; F2 rethrow for
+SQS too; <code>createDlqTopics</code> and <code>&lt;topic&gt;.dlq</code>
+constants deprecated.</td>
+<td>major</td>
+<td>Everyone</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>SQS side effect of F2.</strong> Making the SQS tracing
+wrapper rethrow means failed SQS messages start returning to their
+queues in traced environments, which is correct but may surface
+redelivery volume that was hidden. That is why it waits for Phase 4 and
+needs confirmation that every SQS queue has a redrive policy.</p>
+<p><strong>Existing <code>&lt;topic&gt;.dlq</code> topics.</strong>
+Nothing writes to them through core. Before deprecating, search services
+for manual producers to <code>*_DOMAIN_TOPIC_DLQ</code>; any found move
+to <code>KafkaDlqService</code>.</p>
+</section>
+<section class="doc"><h2 id="risks-and-open-questions">Risks and open questions</h2>
+<p><strong>Risks</strong></p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Non-idempotent handlers double-apply effects on retry or
+redrive.</td>
+<td>Opt-in per service with an idempotency checklist;
+<code>KafkaMessageMeta.messageId</code> +
+<code>runWithMessageIdempotency</code>.</td>
+</tr>
+<tr>
+<td>Retries amplify load on a struggling downstream.</td>
+<td>Inline budget is about 2.6 s; tiers are fixed delays, not tight
+loops; <code>retry_backlog</code> alert.</td>
+</tr>
+<tr>
+<td>Non-blocking retries reorder events for the same key.</td>
+<td><code>ordering: 'strict'</code> for handlers that need order; teams
+list such handlers during adoption.</td>
+</tr>
+<tr>
+<td>Overriding <code>handleEvent</code> couples us to NestJS
+<code>Server</code> internals.</td>
+<td>Covered by an e2e spec in <code>src/tests/kafka</code> that asserts
+a throwing handler reaches the consumer; re-run on every NestJS
+bump.</td>
+</tr>
+<tr>
+<td>Tier consumer pause/resume misbehaves across rebalances.</td>
+<td>Re-evaluate due times on every assignment; integration test with a
+forced rebalance.</td>
+</tr>
+<tr>
+<td>3 extra topics per service increase cluster partition count.</td>
+<td>7 partitions per service at defaults; check against MSK limits
+before Phase 4.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Open questions for reviewers</strong></p>
+<ul class="task-list">
+<li><label><span class="box-q" aria-hidden="true"></span>Per consumer group DLQ
+(<code>&lt;groupId&gt;.dlq</code>) instead of the current per-topic
+<code>.dlq</code>: agreed?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Should
+<code>NotFoundException</code> be retryable by default (eventual
+consistency) or not (bad reference)?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Default tiers <code>1m</code> and
+<code>10m</code>: enough to cover typical incidents, or add
+<code>1h</code>?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Do services have create-topic ACLs
+in production MSK, or must retry and DLQ topics go through the platform
+topic list?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Do all SQS queues have a redrive
+policy configured, as Phase 4 assumes?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Which team owns DLQ alerts: the
+consuming service's team, or platform on-call?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Is a DLQ retention of 30 days
+acceptable for personal data in payloads?</label></li>
+<li><label><span class="box-q" aria-hidden="true"></span>Which service should pilot Phase
+1?</label></li>
+</ul>
+</section>
+
+    <footer>Code references are against <code>@emilgroup/core</code> 11.46.0, <code>@nestjs/microservices</code> 11.1.24 and <code>@confluentinc/kafka-javascript</code> 1.8.2.</footer>
+  </main>
+</div>
+</body>
+</html>
