@@ -167,7 +167,7 @@ Cancelled: from any open stage, humans only.</div>
     <tr><td><code>IssueTracker</code></td><td>Intake, Refining</td><td>Jira (own client + CLI)</td></tr>
     <tr><td><code>CodeHost</code></td><td>Implementing, review loop</td><td>Bitbucket (ported from the <code>eis</code> CLI)</td></tr>
     <tr><td><code>CiProvider</code></td><td>review, Merging</td><td>Bitbucket Pipelines + commit statuses</td></tr>
-    <tr><td><code>AgentRuntime</code></td><td>every working stage</td><td>Claude Code in isolated worktrees</td></tr>
+    <tr><td><code>AgentRuntime</code></td><td>every working stage</td><td>Claude Code in a git worktree per work item and repo (decided; containers possible later)</td></tr>
     <tr><td><code>DeploymentTracker</code></td><td>Verifying</td><td>Bitbucket deployments / kubectl</td></tr>
     <tr><td><code>AlertSource</code></td><td>Incidents</td><td>To decide (Sentry, CloudWatch, …)</td></tr>
   </table>
@@ -252,7 +252,6 @@ GET  /v1/events?since={seq}                      work_item_updated, agent_run_up
   <h2 id="questions">15. Open questions</h2>
   <div class="card q">Which monitoring should be the first <code>AlertSource</code> for EIS: CloudWatch, Sentry, or Kubernetes health checks?</div>
   <div class="card q">Should a factory work item be written back to Jira (status transitions, comments with links to PRs), or should Jira only be read from at first?</div>
-  <div class="card q">Agent isolation: a git worktree per work item on the host, or a container per run from the start?</div>
 </main>
 </body>
 </html>
