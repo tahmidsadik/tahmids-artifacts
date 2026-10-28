@@ -1,5 +1,12 @@
 [
   {
+    "slug": "kafka-consumer-retries",
+    "title": "Kafka Consumer Retries",
+    "summary": "Animated draft design: inline retries, then per-service SQS retry queue and DLQ for Kafka consumers in @emilgroup/core.",
+    "date": "2026-10-28",
+    "updated": "2026-10-28"
+  },
+  {
     "slug": "retry-factory",
     "title": "The Retry Factory",
     "summary": "Kafka consumer retries as a Factorio-style production line: belts, inserters, robots and retry chests.",
@@ -10,13 +17,6 @@
     "slug": "kafka-retry-diagrams",
     "title": "Kafka Retry Diagrams",
     "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
-    "date": "2026-10-28",
-    "updated": "2026-10-28"
-  },
-  {
-    "slug": "kafka-consumer-retries",
-    "title": "Kafka Consumer Retries",
-    "summary": "Animated draft design: inline retries, then per-service SQS retry queues and DLQs for Kafka consumers in @emilgroup/core.",
     "date": "2026-10-28",
     "updated": "2026-10-28"
   },
