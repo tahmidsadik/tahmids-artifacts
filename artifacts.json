@@ -1,15 +1,15 @@
 [
   {
-    "slug": "kafka-retry-design",
-    "title": "Kafka Retry Design",
-    "summary": "Design proposal for bounded retries, delay tiers and per-service dead-letter topics for Kafka consumers in @emilgroup/core.",
+    "slug": "kafka-retry-diagrams",
+    "title": "Kafka Retry Diagrams",
+    "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
     "date": "2026-10-28",
     "updated": "2026-10-28"
   },
   {
-    "slug": "kafka-retry-diagrams",
-    "title": "Kafka Retry Diagrams",
-    "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
+    "slug": "kafka-retry-design",
+    "title": "Kafka Retry Design",
+    "summary": "Design proposal for bounded retries, delay tiers and per-service dead-letter topics for Kafka consumers in @emilgroup/core.",
     "date": "2026-10-28",
     "updated": "2026-10-28"
   },
