@@ -1,15 +1,15 @@
 [
   {
-    "slug": "kafka-consumer-retries",
-    "title": "Kafka Consumer Retries",
-    "summary": "Animated draft design: inline retries, then per-service SQS retry queues and DLQs for Kafka consumers in @emilgroup/core.",
+    "slug": "kafka-retry-diagrams",
+    "title": "Kafka Retry Diagrams",
+    "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
     "date": "2026-10-28",
     "updated": "2026-10-28"
   },
   {
-    "slug": "kafka-retry-diagrams",
-    "title": "Kafka Retry Diagrams",
-    "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
+    "slug": "kafka-consumer-retries",
+    "title": "Kafka Consumer Retries",
+    "summary": "Animated draft design: inline retries, then per-service SQS retry queues and DLQs for Kafka consumers in @emilgroup/core.",
     "date": "2026-10-28",
     "updated": "2026-10-28"
   },
