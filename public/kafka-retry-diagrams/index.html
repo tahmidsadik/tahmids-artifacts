@@ -1,0 +1,755 @@
+<title>Kafka Retry Diagrams</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an engineering review sheet. Sticky figure index on the left, one claim per figure on the right. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --fg: #141a21;
+  --muted: #586473;
+  --rule: #d9dee4;
+  --line: #8c96a3;
+  --accent: #0a6f6a;
+  --good: #1d7f46;
+  --bad: #c0362c;
+  --warn: #a8670d;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+    --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+  --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 48px;
+}
+@media (max-width: 960px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } .toc { position: static !important; } }
+
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13.5px; }
+.toc h2 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a { display: grid; grid-template-columns: 34px 1fr; padding: 5px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+.toc a span { color: var(--muted); font-family: var(--font-mono); font-size: 12px; padding-top: 1px; }
+.toc a:hover, .toc a:focus-visible { background: var(--surface); outline: none; box-shadow: inset 0 0 0 1px var(--rule); }
+.toc .group { margin: 14px 0 4px 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+main { min-width: 0; display: grid; gap: 56px; }
+header h1 { font: 700 clamp(28px, 4vw, 40px)/1.1 var(--font-display); letter-spacing: -.01em; margin: 0 0 12px; text-wrap: balance; }
+header p { margin: 0; max-width: 66ch; color: var(--muted); }
+header p + p { margin-top: 8px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, .mono { font-family: var(--font-mono); font-size: .9em; }
+
+.decisions { margin-top: 24px; border: 1px solid var(--rule); background: var(--surface); border-radius: 10px; padding: 18px 20px; }
+.decisions h2 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.decisions ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+.part-label { font: 600 11px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 -36px; }
+
+section.fig { display: grid; gap: 14px; scroll-margin-top: 24px; }
+main > *, section.fig > * { min-width: 0; }
+.fig .eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.fig h3 { font: 600 22px/1.25 var(--font-display); margin: 0; text-wrap: balance; max-width: 40ch; }
+.fig > p { margin: 0; max-width: 70ch; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+.scroll { overflow-x: auto; padding: 20px; }
+figcaption { border-top: 1px solid var(--rule); padding: 12px 20px; font-size: 13.5px; color: var(--muted); }
+.review { font-size: 13.5px; border-left: 2px solid var(--warn); padding: 2px 0 2px 12px; max-width: 70ch; }
+.review b { color: var(--warn); font-weight: 600; }
+
+/* Diagram drawing classes */
+svg.dg { display: block; width: 100%; height: auto; min-width: 700px; font-family: var(--font-body); }
+.dg text { fill: var(--fg); font-size: 13px; }
+.dg text.s { font-size: 11.5px; fill: var(--muted); }
+.dg text.m { font-family: var(--font-mono); font-size: 12px; }
+.dg text.ms { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.dg text.b { font-weight: 600; }
+.dg text.tbad { fill: var(--bad); }
+.dg text.tgood { fill: var(--good); }
+.dg text.tacc { fill: var(--accent); }
+.dg text.cap { font-size: 10.5px; letter-spacing: .08em; fill: var(--muted); }
+.dg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+.dg .dim { fill: var(--bg); stroke: var(--rule); stroke-width: 1.25; }
+.dg .badbox { fill: color-mix(in srgb, var(--bad) 13%, var(--surface)); stroke: var(--bad); stroke-width: 1.75; }
+.dg .goodbox { fill: color-mix(in srgb, var(--good) 13%, var(--surface)); stroke: var(--good); stroke-width: 1.5; }
+.dg .warnbox { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); stroke-width: 1.5; }
+.dg .accbox { fill: color-mix(in srgb, var(--accent) 12%, var(--surface)); stroke: var(--accent); stroke-width: 1.75; }
+.dg .band-acc { fill: color-mix(in srgb, var(--accent) 7%, transparent); }
+.dg .ln { fill: none; stroke: var(--line); stroke-width: 1.25; }
+.dg .ln-bad { fill: none; stroke: var(--bad); stroke-width: 1.5; }
+.dg .ln-acc { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.dg .life { stroke: var(--rule); stroke-width: 1.25; stroke-dasharray: 4 5; }
+.dg .rule { stroke: var(--rule); stroke-width: 1; }
+.dg .dash { stroke-dasharray: 5 4; }
+.dg .mk { fill: var(--line); }
+.dg .mk-bad { fill: var(--bad); }
+.dg .mk-acc { fill: var(--accent); }
+.dg .dot-acc { fill: var(--accent); }
+.dg .dot-hollow { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }
+.dg .sw-good { fill: color-mix(in srgb, var(--good) 13%, var(--surface)); stroke: var(--good); }
+.dg .sw-bad { fill: color-mix(in srgb, var(--bad) 13%, var(--surface)); stroke: var(--bad); }
+.dg .sw-dim { fill: var(--bg); stroke: var(--rule); }
+.dg .sw-warn { fill: color-mix(in srgb, var(--warn) 14%, var(--surface)); stroke: var(--warn); }
+
+/* Message anatomy */
+.record { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; font-family: var(--font-mono); font-size: 12.5px; }
+@media (max-width: 720px) { .record { grid-template-columns: minmax(0, 1fr); } }
+.record > div { padding: 18px 20px; min-width: 0; }
+.record > div + div { border-left: 1px solid var(--rule); }
+@media (max-width: 720px) { .record > div + div { border-left: 0; border-top: 1px solid var(--rule); } }
+.record h4 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.record h4.added { color: var(--accent); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 14px; margin: 0 0 16px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.kv.added dt { color: var(--accent); }
+.record pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
+
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Figures">
+    <h2>Figures</h2>
+    <ol>
+      <li class="group">The problem</li>
+      <li><a href="#today"><span>01</span>Where the error goes</a></li>
+      <li><a href="#partition"><span>02</span>One poison message</a></li>
+      <li class="group">Options</li>
+      <li><a href="#options"><span>03</span>Where a failure waits</a></li>
+      <li class="group">The design</li>
+      <li><a href="#lifecycle"><span>04</span>Message lifecycle</a></li>
+      <li><a href="#topology"><span>05</span>Topics per group</a></li>
+      <li><a href="#tiers"><span>06</span>One topic per delay</a></li>
+      <li><a href="#anatomy"><span>07</span>A DLQ record</a></li>
+      <li class="group">Operating it</li>
+      <li><a href="#redrive"><span>08</span>Redrive flow</a></li>
+      <li class="group">Rollout</li>
+      <li><a href="#rollout"><span>09</span>Phases and gates</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header>
+      <h1>Kafka retry and dead-letter design, in diagrams</h1>
+      <p>A visual companion to the <a href="https://claude.ai/artifact/5nseHL9Yhmbb1SPyDcGH97" target="_blank" rel="noopener">design proposal</a>. Each figure makes one point; the proposal has the full reasoning, API and open questions.</p>
+      <p>Code references are against <code>@emilgroup/core</code> 11.46.0, <code>@nestjs/microservices</code> 11.1.24 and <code>@confluentinc/kafka-javascript</code> 1.8.2.</p>
+      <div class="decisions">
+        <h2>What you are deciding</h2>
+        <ol>
+          <li>Hybrid retry: three inline attempts, then 1-minute and 10-minute retry topics, then DLQ (<a href="#options">fig 03</a>, <a href="#lifecycle">04</a>).</li>
+          <li>Retry and DLQ topics per consumer group instead of the current per-topic <code>.dlq</code> (<a href="#topology">fig 05</a>).</li>
+          <li>At-least-once delivery with idempotent handlers as the contract; strict ordering only where a handler opts in.</li>
+        </ol>
+      </div>
+    </header>
+
+    <p class="part-label">The problem</p>
+
+    <!-- FIG 1 -->
+    <section class="fig" id="today">
+      <div class="eyebrow">Fig 01 · today</div>
+      <h3>A handler error never reaches Kafka, so the offset is committed and the message is lost</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 600" role="img" aria-label="Sequence: the handler throws, NestJS converts the error into an Observable nobody subscribes to, the consumer sees success and commits the offset">
+            <defs>
+              <marker id="f1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+              <marker id="f1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-bad"/></marker>
+            </defs>
+            <g>
+              <line class="life" x1="90" y1="76" x2="90" y2="588"/>
+              <line class="life" x1="270" y1="76" x2="270" y2="588"/>
+              <line class="life" x1="450" y1="76" x2="450" y2="588"/>
+              <line class="life" x1="630" y1="76" x2="630" y2="588"/>
+              <line class="life" x1="810" y1="76" x2="810" y2="588"/>
+            </g>
+            <g>
+              <rect class="box" x="15" y="24" width="150" height="52" rx="8"/>
+              <text class="b" x="90" y="46" text-anchor="middle">Kafka client</text>
+              <text class="ms" x="90" y="64" text-anchor="middle">eachMessage loop</text>
+              <rect class="box" x="195" y="24" width="150" height="52" rx="8"/>
+              <text class="b" x="270" y="46" text-anchor="middle">Consumer service</text>
+              <text class="ms" x="270" y="64" text-anchor="middle">core / kafka</text>
+              <rect class="box" x="375" y="24" width="150" height="52" rx="8"/>
+              <text class="b" x="450" y="46" text-anchor="middle">Server.handleEvent</text>
+              <text class="ms" x="450" y="64" text-anchor="middle">nestjs/microservices</text>
+              <rect class="box" x="555" y="24" width="150" height="52" rx="8"/>
+              <text class="b" x="630" y="46" text-anchor="middle">RpcProxy + filter</text>
+              <text class="ms" x="630" y="64" text-anchor="middle">nestjs/microservices</text>
+              <rect class="box" x="735" y="24" width="150" height="52" rx="8"/>
+              <text class="b" x="810" y="46" text-anchor="middle">Your handler</text>
+              <text class="ms" x="810" y="64" text-anchor="middle">@KafkaMessageHandler</text>
+            </g>
+            <g>
+              <line class="ln" x1="90" y1="112" x2="270" y2="112" marker-end="url(#f1a)"/>
+              <text class="m" x="180" y="104" text-anchor="middle">eachMessage(msg)</text>
+              <line class="ln" x1="270" y1="156" x2="450" y2="156" marker-end="url(#f1a)"/>
+              <text class="m" x="360" y="148" text-anchor="middle">handleEvent()</text>
+              <line class="ln" x1="450" y1="200" x2="630" y2="200" marker-end="url(#f1a)"/>
+              <text class="m" x="540" y="192" text-anchor="middle">handler(data, ctx)</text>
+              <line class="ln" x1="630" y1="244" x2="810" y2="244" marker-end="url(#f1a)"/>
+              <text x="720" y="236" text-anchor="middle">invoke method</text>
+              <line class="ln-bad dash" x1="810" y1="288" x2="630" y2="288" marker-end="url(#f1b)"/>
+              <text class="tbad b" x="720" y="280" text-anchor="middle">throws Error</text>
+
+              <rect class="box" x="555" y="304" width="150" height="48" rx="8"/>
+              <text class="s" x="630" y="324" text-anchor="middle">filter catches it and</text>
+              <text class="ms" x="630" y="341" text-anchor="middle">returns throwError()</text>
+
+              <rect class="warnbox" x="735" y="304" width="150" height="60" rx="8"/>
+              <text class="s" x="810" y="324" text-anchor="middle">TRACING_ENABLED=true:</text>
+              <text class="s" x="810" y="340" text-anchor="middle">tracing wrapper also</text>
+              <text class="s" x="810" y="356" text-anchor="middle">swallows it (F2)</text>
+
+              <line class="ln dash" x1="630" y1="380" x2="450" y2="380" marker-end="url(#f1a)"/>
+              <text x="540" y="372" text-anchor="middle">returns Observable</text>
+
+              <rect class="badbox" x="375" y="396" width="150" height="54" rx="8"/>
+              <text class="ms" x="450" y="417" text-anchor="middle" style="fill: var(--fg)">connect() to Subject</text>
+              <text class="b tbad" x="450" y="437" text-anchor="middle">0 subscribers: dropped</text>
+
+              <line class="ln dash" x1="450" y1="478" x2="270" y2="478" marker-end="url(#f1a)"/>
+              <text x="360" y="470" text-anchor="middle">resolves, no error</text>
+              <line class="ln dash" x1="270" y1="516" x2="90" y2="516" marker-end="url(#f1a)"/>
+              <text x="180" y="508" text-anchor="middle">resolves</text>
+
+              <rect class="badbox" x="15" y="532" width="150" height="52" rx="8"/>
+              <text class="b" x="90" y="554" text-anchor="middle">offset committed</text>
+              <text class="s tbad" x="90" y="572" text-anchor="middle">message lost</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>The core consumer calls <code>server.handleEvent()</code>. NestJS connects the handler's error Observable to a Subject with no subscribers, so the error never comes back. The consumer service sees success and the confluent client stores offset + 1.</figcaption>
+      </figure>
+      <p class="review"><b>Check:</b> the fix overrides <code>handleEvent</code> in <code>KafkaConsumerServer</code> to await the Observable, the way the SQS transport already does with <code>firstValueFrom</code>.</p>
+    </section>
+
+    <!-- FIG 2 -->
+    <section class="fig" id="partition">
+      <div class="eyebrow">Fig 02 · one partition, offsets 40 to 47</div>
+      <h3>Fixing propagation alone would trade silent loss for a partition stuck on one bad message</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 450" role="img" aria-label="Three rows of offsets. Today message 42 is skipped. With only the propagation fix, 42 is re-read forever and 43 to 47 wait. Proposed: 42 is retried three times then moved to the retry topic and 43 to 47 keep flowing.">
+            <defs>
+              <marker id="f2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-bad"/></marker>
+              <marker id="f2c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-acc"/></marker>
+            </defs>
+            <g>
+              <rect class="sw-good" x="480" y="16" width="12" height="12" rx="3"/><text class="s" x="498" y="27">processed</text>
+              <rect class="sw-bad" x="580" y="16" width="12" height="12" rx="3"/><text class="s" x="598" y="27">failing</text>
+              <rect class="sw-warn" x="664" y="16" width="12" height="12" rx="3"/><text class="s" x="682" y="27">retrying in place</text>
+              <rect class="sw-dim" x="796" y="16" width="12" height="12" rx="3"/><text class="s" x="814" y="27">waiting</text>
+            </g>
+
+            <!-- Row 1: today -->
+            <text class="b" x="20" y="88">Today</text>
+            <text class="s" x="20" y="106">error swallowed</text>
+            <g>
+              <rect class="goodbox" x="220" y="70" width="72" height="44" rx="6"/><text class="m" x="256" y="97" text-anchor="middle">40</text>
+              <rect class="goodbox" x="300" y="70" width="72" height="44" rx="6"/><text class="m" x="336" y="97" text-anchor="middle">41</text>
+              <rect class="badbox" x="380" y="70" width="72" height="44" rx="6"/><text class="m" x="416" y="97" text-anchor="middle">42</text>
+              <rect class="goodbox" x="460" y="70" width="72" height="44" rx="6"/><text class="m" x="496" y="97" text-anchor="middle">43</text>
+              <rect class="goodbox" x="540" y="70" width="72" height="44" rx="6"/><text class="m" x="576" y="97" text-anchor="middle">44</text>
+              <rect class="goodbox" x="620" y="70" width="72" height="44" rx="6"/><text class="m" x="656" y="97" text-anchor="middle">45</text>
+              <rect class="goodbox" x="700" y="70" width="72" height="44" rx="6"/><text class="m" x="736" y="97" text-anchor="middle">46</text>
+              <rect class="goodbox" x="780" y="70" width="72" height="44" rx="6"/><text class="m" x="816" y="97" text-anchor="middle">47</text>
+              <text class="s tbad" x="416" y="134" text-anchor="middle">committed as success, lost</text>
+            </g>
+
+            <!-- Row 2: F1 only -->
+            <text class="b" x="20" y="202">Fix F1 only</text>
+            <text class="s" x="20" y="220">no retry policy</text>
+            <g>
+              <rect class="goodbox" x="220" y="184" width="72" height="44" rx="6"/><text class="m" x="256" y="211" text-anchor="middle">40</text>
+              <rect class="goodbox" x="300" y="184" width="72" height="44" rx="6"/><text class="m" x="336" y="211" text-anchor="middle">41</text>
+              <rect class="badbox" x="380" y="184" width="72" height="44" rx="6"/><text class="m" x="416" y="211" text-anchor="middle">42</text>
+              <path class="ln-bad" d="M400 184 C 392 152, 440 152, 432 182" marker-end="url(#f2b)"/>
+              <text class="s tbad" x="448" y="162">seek back, re-read at once, forever</text>
+              <rect class="dim" x="460" y="184" width="72" height="44" rx="6"/><text class="ms" x="496" y="211" text-anchor="middle">43</text>
+              <rect class="dim" x="540" y="184" width="72" height="44" rx="6"/><text class="ms" x="576" y="211" text-anchor="middle">44</text>
+              <rect class="dim" x="620" y="184" width="72" height="44" rx="6"/><text class="ms" x="656" y="211" text-anchor="middle">45</text>
+              <rect class="dim" x="700" y="184" width="72" height="44" rx="6"/><text class="ms" x="736" y="211" text-anchor="middle">46</text>
+              <rect class="dim" x="780" y="184" width="72" height="44" rx="6"/><text class="ms" x="816" y="211" text-anchor="middle">47</text>
+              <text class="s" x="656" y="250" text-anchor="middle">partition blocked until someone intervenes</text>
+            </g>
+
+            <!-- Row 3: proposed -->
+            <text class="b tacc" x="20" y="316">Proposed</text>
+            <text class="s" x="20" y="334">inline retry, then tier</text>
+            <g>
+              <rect class="goodbox" x="220" y="298" width="72" height="44" rx="6"/><text class="m" x="256" y="325" text-anchor="middle">40</text>
+              <rect class="goodbox" x="300" y="298" width="72" height="44" rx="6"/><text class="m" x="336" y="325" text-anchor="middle">41</text>
+              <rect class="warnbox" x="380" y="298" width="72" height="44" rx="6"/><text class="m" x="416" y="325" text-anchor="middle">42</text>
+              <rect class="goodbox" x="460" y="298" width="72" height="44" rx="6"/><text class="m" x="496" y="325" text-anchor="middle">43</text>
+              <rect class="goodbox" x="540" y="298" width="72" height="44" rx="6"/><text class="m" x="576" y="325" text-anchor="middle">44</text>
+              <rect class="goodbox" x="620" y="298" width="72" height="44" rx="6"/><text class="m" x="656" y="325" text-anchor="middle">45</text>
+              <rect class="goodbox" x="700" y="298" width="72" height="44" rx="6"/><text class="m" x="736" y="325" text-anchor="middle">46</text>
+              <rect class="goodbox" x="780" y="298" width="72" height="44" rx="6"/><text class="m" x="816" y="325" text-anchor="middle">47</text>
+              <path class="ln-acc" d="M416 342 V390" marker-end="url(#f2c)"/>
+              <text class="s" x="424" y="370">after 3 tries (about 2.6 s), copy moves on</text>
+              <rect class="accbox" x="316" y="392" width="200" height="40" rx="8"/>
+              <text class="m" x="416" y="417" text-anchor="middle">&lt;group&gt;.retry.1m</text>
+              <text class="s tgood" x="852" y="364" text-anchor="end">43 to 47 keep flowing</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>When <code>eachMessage</code> throws, the confluent client seeks back to the same offset and re-reads it immediately; its <code>retry</code> option only covers broker calls. This is why the propagation fix and bounded retries ship together in Phase 1.</figcaption>
+      </figure>
+    </section>
+
+    <p class="part-label">Options</p>
+
+    <!-- FIG 3 -->
+    <section class="fig" id="options">
+      <div class="eyebrow">Fig 03 · options A to D</div>
+      <h3>Only the hybrid keeps the partition free after a few seconds and still rides out a 10-minute outage</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 380" role="img" aria-label="Timeline per option of where a failing message waits. A blocks the partition for minutes. B and C wait off the partition from the start. D blocks for about 3 seconds then waits in 1 minute and 10 minute retry topics.">
+            <rect class="band-acc" x="8" y="272" width="884" height="60" rx="8"/>
+            <text class="cap" x="240" y="34">NOT TO SCALE</text>
+            <text class="s b" x="810" y="62" style="fill: var(--fg)">Extra infra</text>
+            <line class="rule" x1="240" y1="70" x2="760" y2="70"/>
+            <g>
+              <line class="rule" x1="240" y1="66" x2="240" y2="74"/><text class="ms" x="240" y="60" text-anchor="middle">0</text>
+              <line class="rule" x1="330" y1="66" x2="330" y2="74"/><text class="ms" x="330" y="60" text-anchor="middle">~3 s</text>
+              <line class="rule" x1="480" y1="66" x2="480" y2="74"/><text class="ms" x="480" y="60" text-anchor="middle">1 min</text>
+              <line class="rule" x1="660" y1="66" x2="660" y2="74"/><text class="ms" x="660" y="60" text-anchor="middle">10 min</text>
+              <line class="rule" x1="760" y1="66" x2="760" y2="74"/><text class="ms" x="760" y="60" text-anchor="middle">end</text>
+            </g>
+
+            <!-- A -->
+            <text class="b" x="20" y="118">A · Blocking retry</text>
+            <text class="s" x="20" y="134">retry in place, then DLQ</text>
+            <rect class="badbox" x="240" y="110" width="320" height="20" rx="4"/>
+            <text class="s" x="400" y="124" text-anchor="middle" style="fill: var(--fg)">partition blocked</text>
+            <path class="box" d="M572 111 L581 120 L572 129 L563 120 Z"/>
+            <text class="s" x="589" y="124">DLQ</text>
+            <text class="s" x="400" y="148" text-anchor="middle">must finish inside the 5-min poll limit</text>
+            <text class="s" x="810" y="124">DLQ only</text>
+
+            <!-- B -->
+            <text class="b" x="20" y="178">B · Retry topics only</text>
+            <text class="s" x="20" y="194">every failure leaves</text>
+            <rect class="accbox" x="240" y="170" width="510" height="20" rx="4"/>
+            <text class="s" x="360" y="184" text-anchor="middle" style="fill: var(--fg)">waits in retry topics</text>
+            <circle class="dot-acc" cx="480" cy="180" r="4.5"/><circle class="dot-acc" cx="660" cy="180" r="4.5"/>
+            <path class="box" d="M760 171 L769 180 L760 189 L751 180 Z"/>
+            <text class="s" x="776" y="184">DLQ</text>
+            <text class="s" x="400" y="208" text-anchor="middle">even a 50 ms blip pays a full delay</text>
+            <text class="s" x="810" y="184">3 topics/svc</text>
+
+            <!-- C -->
+            <text class="b" x="20" y="238">C · Database retry</text>
+            <text class="s" x="20" y="254">table + scheduler</text>
+            <rect class="accbox dash" x="240" y="230" width="510" height="20" rx="4"/>
+            <text class="s" x="360" y="244" text-anchor="middle" style="fill: var(--fg)">waits in a service table</text>
+            <circle class="dot-hollow" cx="480" cy="240" r="4.5"/><circle class="dot-hollow" cx="660" cy="240" r="4.5"/>
+            <path class="box" d="M760 231 L769 240 L760 249 L751 240 Z"/>
+            <text class="s" x="776" y="244">park</text>
+            <text class="s" x="400" y="268" text-anchor="middle">per-service tenant DB wiring</text>
+            <text class="s" x="810" y="244">table + job/svc</text>
+
+            <!-- D -->
+            <text class="b tacc" x="20" y="298">D · Hybrid</text>
+            <text class="s" x="20" y="314">recommended</text>
+            <rect class="badbox" x="240" y="290" width="90" height="20" rx="4"/>
+            <rect class="accbox" x="334" y="290" width="416" height="20" rx="4"/>
+            <text class="s" x="560" y="304" text-anchor="middle" style="fill: var(--fg)">1m tier, then 10m tier</text>
+            <circle class="dot-acc" cx="480" cy="300" r="4.5"/><circle class="dot-acc" cx="660" cy="300" r="4.5"/>
+            <path class="box" d="M760 291 L769 300 L760 309 L751 300 Z"/>
+            <text class="s" x="776" y="304">DLQ</text>
+            <text class="s" x="285" y="326" text-anchor="middle">3 tries</text>
+            <text class="s" x="810" y="304">3 topics/svc</text>
+
+            <!-- legend -->
+            <g>
+              <rect class="sw-bad" x="240" y="350" width="22" height="12" rx="3"/><text class="s" x="270" y="360">partition blocked</text>
+              <rect class="sw-good" x="390" y="350" width="22" height="12" rx="3" style="fill: color-mix(in srgb, var(--accent) 12%, var(--surface)); stroke: var(--accent)"/><text class="s" x="420" y="360">waiting off the partition</text>
+              <circle class="dot-acc" cx="586" cy="356" r="4.5"/><text class="s" x="598" y="360">retry attempt</text>
+              <path class="box" d="M700 347 L709 356 L700 365 L691 356 Z"/><text class="s" x="716" y="360">end state</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Red is time the partition cannot make progress. The hybrid (D) blocks only for its three inline attempts, then behaves like B. Strict-ordering handlers can opt back into A.</figcaption>
+      </figure>
+    </section>
+
+    <p class="part-label">The design</p>
+
+    <!-- FIG 4 -->
+    <section class="fig" id="lifecycle">
+      <div class="eyebrow">Fig 04 · message lifecycle</div>
+      <h3>Every failure ends in a commit or the service's DLQ, never in silence</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 760 448" role="img" aria-label="Flow: source topic to handler. Success commits. Non-retryable failures go to the DLQ. Retryable failures retry inline three times, then go to retry tiers, which feed the handler again when due. After the last tier the message goes to the DLQ, from where it can be redriven to the tiers.">
+            <defs>
+              <marker id="f4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+              <marker id="f4c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-acc"/></marker>
+            </defs>
+            <g class="ln">
+              <path class="ln" d="M155 96H235" marker-end="url(#f4a)"/>
+              <path class="ln" d="M385 96H436" marker-end="url(#f4a)"/>
+              <path class="ln" d="M564 96H595" marker-end="url(#f4a)"/>
+              <path class="ln" d="M500 132V180" marker-end="url(#f4a)"/>
+              <path class="ln" d="M436 216H395" marker-end="url(#f4a)"/>
+              <path class="ln" d="M310 188V120" marker-end="url(#f4a)"/>
+              <path class="ln" d="M564 216H665V308" marker-end="url(#f4a)"/>
+              <path class="ln" d="M310 244V300" marker-end="url(#f4a)"/>
+              <path class="ln" d="M405 336H595" marker-end="url(#f4a)"/>
+              <path class="ln" d="M215 336H185V110H235" marker-end="url(#f4a)"/>
+              <path class="ln-acc dash" d="M665 364V420H310V372" marker-end="url(#f4c)"/>
+            </g>
+            <rect class="box" x="25" y="72" width="130" height="48" rx="8"/><text x="90" y="100" text-anchor="middle">Source topic</text>
+            <rect class="box" x="235" y="72" width="150" height="48" rx="8"/><text class="b" x="310" y="100" text-anchor="middle">Handler</text>
+            <polygon class="box" points="436,96 500,60 564,96 500,132"/><text x="500" y="100" text-anchor="middle">Succeeded?</text>
+            <rect class="goodbox" x="595" y="72" width="140" height="48" rx="8"/><text class="b" x="665" y="100" text-anchor="middle">Commit offset</text>
+            <polygon class="box" points="436,216 500,180 564,216 500,252"/><text x="500" y="220" text-anchor="middle">Retryable?</text>
+            <rect class="warnbox" x="225" y="188" width="170" height="56" rx="8"/>
+            <text class="b" x="310" y="211" text-anchor="middle">Inline retry</text>
+            <text class="s" x="310" y="231" text-anchor="middle">3 attempts, ~2.6 s</text>
+            <rect class="accbox" x="215" y="300" width="190" height="72" rx="8"/>
+            <text class="b" x="310" y="322" text-anchor="middle">Retry tiers</text>
+            <text class="ms" x="310" y="342" text-anchor="middle">&lt;group&gt;.retry.1m</text>
+            <text class="ms" x="310" y="358" text-anchor="middle">&lt;group&gt;.retry.10m</text>
+            <rect class="badbox" x="595" y="308" width="140" height="56" rx="8"/>
+            <text class="m b" x="665" y="331" text-anchor="middle">&lt;group&gt;.dlq</text>
+            <text class="s" x="665" y="351" text-anchor="middle">alert fires</text>
+            <text class="s" x="580" y="88" text-anchor="middle">yes</text>
+            <text class="s" x="508" y="162">no</text>
+            <text class="s" x="415" y="208" text-anchor="middle">yes</text>
+            <text class="s" x="615" y="208" text-anchor="middle">no</text>
+            <text class="s" x="318" y="160">retry in place</text>
+            <text class="s" x="318" y="278">attempts used up</text>
+            <text class="s" x="500" y="326" text-anchor="middle">last tier used up</text>
+            <text class="s" x="177" y="230" text-anchor="end">when due</text>
+            <text class="s tacc" x="487" y="412" text-anchor="middle">redrive (CLI, manual)</text>
+          </svg>
+        </div>
+        <figcaption>Each tier attempt runs the same handler with the same inline retries. Malformed messages (bad JSON, no event type) skip straight to the DLQ instead of being dropped. Non-retryable: <code>NonRetryableKafkaError</code>, 400 and 422 exceptions, validation errors.</figcaption>
+      </figure>
+      <p class="review"><b>Check:</b> publishing to the next tier is awaited before the offset commits. If the publish fails, the error is thrown and the client re-reads the message: a duplicate is possible, a loss is not.</p>
+    </section>
+
+    <!-- FIG 5 -->
+    <section class="fig" id="topology">
+      <div class="eyebrow">Fig 05 · topic layout, example topic eis.account.events</div>
+      <h3>Retry and DLQ topics belong to the consumer group, so a redrive only reaches the service that failed</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 384" role="img" aria-label="Left, today: one source topic, three consumer groups, one shared per-topic DLQ that nothing writes to. Right, proposed: each group has its own retry and DLQ topics; the failing billing group sends to its own stack and redrives back to itself.">
+            <defs>
+              <marker id="f5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+              <marker id="f5c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-acc"/></marker>
+            </defs>
+            <line class="rule" x1="450" y1="20" x2="450" y2="370"/>
+
+            <!-- Today -->
+            <text class="b" x="20" y="30">Today</text>
+            <text class="s" x="20" y="48">one DLQ per source topic</text>
+            <rect class="box" x="100" y="64" width="250" height="40" rx="8"/>
+            <text class="m" x="225" y="89" text-anchor="middle">eis.account.events</text>
+            <path class="ln" d="M225 104 L80 150" marker-end="url(#f5a)"/>
+            <path class="ln" d="M225 104 L225 150" marker-end="url(#f5a)"/>
+            <path class="ln" d="M225 104 L370 150" marker-end="url(#f5a)"/>
+            <text class="s" x="232" y="132">consumes</text>
+            <rect class="badbox" x="20" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="80" y="170" text-anchor="middle">billing</text>
+            <text class="s" x="80" y="188" text-anchor="middle">consumer group</text>
+            <rect class="box" x="165" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="225" y="170" text-anchor="middle">customer</text>
+            <text class="s" x="225" y="188" text-anchor="middle">consumer group</text>
+            <rect class="box" x="310" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="370" y="170" text-anchor="middle">notification</text>
+            <text class="s" x="370" y="188" text-anchor="middle">consumer group</text>
+            <text class="s tbad" x="80" y="216" text-anchor="middle">failure: lost</text>
+            <rect class="dim dash" x="100" y="250" width="250" height="40" rx="8"/>
+            <text class="ms" x="225" y="275" text-anchor="middle">eis.account.events.dlq</text>
+            <text class="s" x="225" y="314" text-anchor="middle">Created by core, never written (F5).</text>
+            <text class="s" x="225" y="332" text-anchor="middle">Replaying into the source topic</text>
+            <text class="s" x="225" y="348" text-anchor="middle">re-delivers to all three groups.</text>
+
+            <!-- Proposed -->
+            <text class="b tacc" x="470" y="30">Proposed</text>
+            <text class="s" x="470" y="48">retry and DLQ topics per consumer group</text>
+            <rect class="box" x="550" y="64" width="250" height="40" rx="8"/>
+            <text class="m" x="675" y="89" text-anchor="middle">eis.account.events</text>
+            <path class="ln" d="M675 104 L530 150" marker-end="url(#f5a)"/>
+            <path class="ln" d="M675 104 L675 150" marker-end="url(#f5a)"/>
+            <path class="ln" d="M675 104 L820 150" marker-end="url(#f5a)"/>
+            <rect class="box" x="470" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="530" y="170" text-anchor="middle">billing</text>
+            <text class="s" x="530" y="188" text-anchor="middle">consumer group</text>
+            <rect class="box" x="615" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="675" y="170" text-anchor="middle">customer</text>
+            <text class="s" x="675" y="188" text-anchor="middle">consumer group</text>
+            <rect class="box" x="760" y="150" width="120" height="48" rx="8"/>
+            <text class="b" x="820" y="170" text-anchor="middle">notification</text>
+            <text class="s" x="820" y="188" text-anchor="middle">consumer group</text>
+
+            <path class="ln-acc" d="M545 198 V248" marker-end="url(#f5c)"/>
+            <text class="s" x="553" y="228">fails</text>
+            <path class="ln-acc dash" d="M510 250 V200" marker-end="url(#f5c)"/>
+            <text class="s tacc" x="502" y="228" text-anchor="end">redrive</text>
+
+            <rect class="accbox" x="470" y="250" width="120" height="72" rx="8"/>
+            <text class="ms" x="530" y="272" text-anchor="middle" style="fill: var(--fg)">.retry.1m</text>
+            <text class="ms" x="530" y="290" text-anchor="middle" style="fill: var(--fg)">.retry.10m</text>
+            <text class="ms" x="530" y="308" text-anchor="middle" style="fill: var(--fg)">.dlq</text>
+            <rect class="dim" x="615" y="250" width="120" height="72" rx="8"/>
+            <text class="ms" x="675" y="272" text-anchor="middle">.retry.1m</text>
+            <text class="ms" x="675" y="290" text-anchor="middle">.retry.10m</text>
+            <text class="ms" x="675" y="308" text-anchor="middle">.dlq</text>
+            <rect class="dim" x="760" y="250" width="120" height="72" rx="8"/>
+            <text class="ms" x="820" y="272" text-anchor="middle">.retry.1m</text>
+            <text class="ms" x="820" y="290" text-anchor="middle">.retry.10m</text>
+            <text class="ms" x="820" y="308" text-anchor="middle">.dlq</text>
+            <path class="ln" d="M675 198 V250" style="stroke: var(--rule)"/>
+            <path class="ln" d="M820 198 V250" style="stroke: var(--rule)"/>
+            <text class="s" x="675" y="348" text-anchor="middle">Each name is prefixed with the group id,</text>
+            <text class="s" x="675" y="366" text-anchor="middle">e.g. billing.retry.1m. Customer and notification are untouched.</text>
+          </svg>
+        </div>
+        <figcaption>Group names are an example. A tier or DLQ record carries <code>x-original-topic</code> and <code>x-event-type</code>, so the group's tier consumer dispatches straight to the handler that failed without touching the source topic. Cost: 3 extra topics (7 partitions) per consuming service at default settings.</figcaption>
+      </figure>
+      <p class="review"><b>Decide:</b> deprecate the existing per-topic <code>.dlq</code> topics and their generated <code>*_DOMAIN_TOPIC_DLQ</code> constants in Phase 4.</p>
+    </section>
+
+    <!-- FIG 6 -->
+    <section class="fig" id="tiers">
+      <div class="eyebrow">Fig 06 · why each delay gets its own topic · now 10:00</div>
+      <h3>Mixing delays in one topic lets a 10-minute message hold back 1-minute ones</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="Top: one retry topic with message X due 10:10 at the head, so Y and Z, due 10:01 and 10:02, wait until 10:10. Bottom: separate 1 minute and 10 minute topics; each resumes on time.">
+            <text class="b" x="20" y="28">One retry topic, mixed delays</text>
+            <text class="s" x="275" y="54" text-anchor="middle">head</text>
+            <text class="m" x="20" y="88">&lt;group&gt;.retry</text>
+            <rect class="box" x="200" y="62" width="150" height="48" rx="8"/>
+            <text class="m" x="275" y="83" text-anchor="middle">X · 10m tier</text>
+            <text class="s" x="275" y="101" text-anchor="middle">due 10:10</text>
+            <rect class="badbox" x="360" y="62" width="150" height="48" rx="8"/>
+            <text class="m" x="435" y="83" text-anchor="middle">Y · 1m tier</text>
+            <text class="s" x="435" y="101" text-anchor="middle">due 10:01</text>
+            <rect class="badbox" x="520" y="62" width="150" height="48" rx="8"/>
+            <text class="m" x="595" y="83" text-anchor="middle">Z · 1m tier</text>
+            <text class="s" x="595" y="101" text-anchor="middle">due 10:02</text>
+            <text x="690" y="82">consumer pauses until 10:10</text>
+            <text class="s tbad" x="690" y="100">Y and Z run 8 to 9 min late</text>
+
+            <line class="rule" x1="20" y1="140" x2="880" y2="140"/>
+
+            <text class="b tacc" x="20" y="174">One topic per delay (proposed)</text>
+            <text class="m" x="20" y="222">&lt;group&gt;.retry.1m</text>
+            <rect class="goodbox" x="200" y="196" width="150" height="48" rx="8"/>
+            <text class="m" x="275" y="217" text-anchor="middle">Y · 1m tier</text>
+            <text class="s" x="275" y="235" text-anchor="middle">due 10:01</text>
+            <rect class="goodbox" x="360" y="196" width="150" height="48" rx="8"/>
+            <text class="m" x="435" y="217" text-anchor="middle">Z · 1m tier</text>
+            <text class="s" x="435" y="235" text-anchor="middle">due 10:02</text>
+            <text class="tgood" x="530" y="225">resumes at 10:01, on time</text>
+
+            <text class="m" x="20" y="292">&lt;group&gt;.retry.10m</text>
+            <rect class="box" x="200" y="266" width="150" height="48" rx="8"/>
+            <text class="m" x="275" y="287" text-anchor="middle">X · 10m tier</text>
+            <text class="s" x="275" y="305" text-anchor="middle">due 10:10</text>
+            <text class="tgood" x="370" y="295">resumes at 10:10, on time</text>
+          </svg>
+        </div>
+        <figcaption>Within one tier every message waits the same time and is appended in failure order, so the head of a partition is always the next one due. The tier consumer pauses that partition until the head's <code>x-retry-not-before</code>, then resumes. Due times are re-checked after every rebalance.</figcaption>
+      </figure>
+    </section>
+
+    <!-- FIG 7 -->
+    <section class="fig" id="anatomy">
+      <div class="eyebrow">Fig 07 · example record in billing.dlq</div>
+      <h3>A DLQ record keeps the original message and adds what an engineer needs to act on it</h3>
+      <figure>
+        <div class="record">
+          <div>
+            <h4>Original, unchanged</h4>
+            <dl class="kv">
+              <dt>key</dt><dd>acc_8Hq2Lm</dd>
+              <dt>x-event-type</dt><dd>account.created</dd>
+              <dt>x-tenant-slug</dt><dd>demo-tenant</dd>
+              <dt>x-correlation-id</dt><dd>3f0c9a1e-…</dd>
+              <dt>x-user-id</dt><dd>b81d…</dd>
+              <dt>x-api-key</dt><dd>•••• masked in CLI</dd>
+            </dl>
+            <h4>Value</h4>
+<pre>{
+  "type": "account.created",
+  "tenantSlug": "demo-tenant",
+  "payload": { "code": "acc_8Hq2Lm", … }
+}</pre>
+          </div>
+          <div>
+            <h4 class="added">Added by core</h4>
+            <dl class="kv added">
+              <dt>x-original-topic</dt><dd>eis.account.events</dd>
+              <dt>x-original-partition</dt><dd>2</dd>
+              <dt>x-original-offset</dt><dd>18734</dd>
+              <dt>x-original-timestamp</dt><dd>1761552000000</dd>
+              <dt>x-consumer-group</dt><dd>billing</dd>
+              <dt>x-retry-attempt</dt><dd>9</dd>
+              <dt>x-retry-tier</dt><dd>retry.10m</dd>
+              <dt>x-error-class</dt><dd>QueryFailedError</dd>
+              <dt>x-error-message</dt><dd>connect ECONNREFUSED 10.0.4.12:5432</dd>
+              <dt>x-failed-at</dt><dd>1761552662000</dd>
+            </dl>
+            <p style="margin:0; font-family: var(--font-body); font-size: 13px; color: var(--muted)">Message id for dedup: <code>eis.account.events:2:18734</code>. Stable across retries and redrives.</p>
+          </div>
+        </div>
+        <figcaption>Example values. 9 attempts = 3 inline, then 3 more in each of the two tiers. <code>x-error-message</code> is cut to 1 KB and carries no stack trace.</figcaption>
+      </figure>
+    </section>
+
+    <p class="part-label">Operating it</p>
+
+    <!-- FIG 8 -->
+    <section class="fig" id="redrive">
+      <div class="eyebrow">Fig 08 · redrive after an incident</div>
+      <h3>Redrive goes through the group's first retry tier, never the source topic</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 910 540" role="img" aria-label="Sequence: engineer lists DLQ entries through the eis CLI and the service's admin endpoint, then redrives one event type. The endpoint publishes copies to the 1 minute tier with attempt reset, commits its own DLQ offset, and the tier consumer runs the handler when due.">
+            <defs>
+              <marker id="f8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+              <marker id="f8c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-acc"/></marker>
+            </defs>
+            <g>
+              <line class="life" x1="80" y1="76" x2="80" y2="480"/>
+              <line class="life" x1="228" y1="76" x2="228" y2="480"/>
+              <line class="life" x1="376" y1="76" x2="376" y2="480"/>
+              <line class="life" x1="524" y1="76" x2="524" y2="480"/>
+              <line class="life" x1="672" y1="76" x2="672" y2="480"/>
+              <line class="life" x1="820" y1="76" x2="820" y2="480"/>
+            </g>
+            <rect class="box" x="16" y="24" width="128" height="52" rx="8"/><text class="b" x="80" y="46" text-anchor="middle">Engineer</text><text class="s" x="80" y="64" text-anchor="middle">on call</text>
+            <rect class="box" x="164" y="24" width="128" height="52" rx="8"/><text class="b" x="228" y="46" text-anchor="middle">eis CLI</text><text class="ms" x="228" y="64" text-anchor="middle">eis kafka dlq</text>
+            <rect class="box" x="312" y="24" width="128" height="52" rx="8"/><text class="b" x="376" y="46" text-anchor="middle">Admin endpoint</text><text class="ms" x="376" y="64" text-anchor="middle">KafkaDlqService</text>
+            <rect class="badbox" x="460" y="24" width="128" height="52" rx="8"/><text class="b" x="524" y="46" text-anchor="middle">DLQ topic</text><text class="ms" x="524" y="64" text-anchor="middle">&lt;group&gt;.dlq</text>
+            <rect class="accbox" x="608" y="24" width="128" height="52" rx="8"/><text class="b" x="672" y="46" text-anchor="middle">Tier 1m topic</text><text class="ms" x="672" y="64" text-anchor="middle" style="font-size:10.5px">&lt;group&gt;.retry.1m</text>
+            <rect class="box" x="756" y="24" width="128" height="52" rx="8"/><text class="b" x="820" y="46" text-anchor="middle">Tier consumer</text><text class="s" x="820" y="64" text-anchor="middle">then handler</text>
+
+            <line class="ln" x1="80" y1="110" x2="228" y2="110" marker-end="url(#f8a)"/><text class="m" x="154" y="102" text-anchor="middle">list --since 1h</text>
+            <line class="ln" x1="228" y1="150" x2="376" y2="150" marker-end="url(#f8a)"/><text class="m" x="302" y="142" text-anchor="middle">GET /dlq</text>
+            <line class="ln" x1="376" y1="190" x2="524" y2="190" marker-end="url(#f8a)"/><text x="450" y="182" text-anchor="middle">read, own group</text>
+            <line class="ln dash" x1="376" y1="230" x2="228" y2="230" marker-end="url(#f8a)"/><text x="302" y="222" text-anchor="middle">grouped entries</text>
+            <line class="ln dash" x1="228" y1="266" x2="80" y2="266" marker-end="url(#f8a)"/><text x="154" y="258" text-anchor="middle">event × error table</text>
+
+            <rect class="box" x="16" y="282" width="128" height="24" rx="6" style="fill: var(--bg)"/>
+            <text class="s" x="80" y="298" text-anchor="middle">fix the cause first</text>
+
+            <line class="ln" x1="80" y1="334" x2="228" y2="334" marker-end="url(#f8a)"/><text class="m" x="154" y="326" text-anchor="middle">redrive --event X</text>
+            <line class="ln" x1="228" y1="374" x2="376" y2="374" marker-end="url(#f8a)"/><text class="m" x="302" y="366" text-anchor="middle">POST /dlq/redrive</text>
+            <line class="ln-acc" x1="376" y1="414" x2="672" y2="414" marker-end="url(#f8c)"/><text class="tacc" x="600" y="406" text-anchor="middle">publish copy, attempt 0</text>
+            <line class="ln" x1="376" y1="446" x2="524" y2="446" marker-end="url(#f8a)"/><text x="450" y="438" text-anchor="middle">commit admin offset</text>
+            <line class="ln-acc" x1="672" y1="478" x2="820" y2="478" marker-end="url(#f8c)"/><text class="s" x="746" y="470" text-anchor="middle">when due</text>
+            <rect class="goodbox" x="756" y="486" width="128" height="44" rx="8"/>
+            <text class="b" x="820" y="505" text-anchor="middle">handler runs</text>
+            <text class="s" x="820" y="521" text-anchor="middle">success commits</text>
+          </svg>
+        </div>
+        <figcaption>The admin endpoint reads the DLQ with its own <code>&lt;group&gt;.dlq-admin</code> consumer group, so committing past a redriven or discarded record is recorded and audited. Copies get <code>x-redriven-at</code> and <code>x-redriven-by</code>. Discard follows the same path without the publish.</figcaption>
+      </figure>
+      <p class="review"><b>Open:</b> which team owns DLQ alerts, the consuming service's team or platform on-call.</p>
+    </section>
+
+    <p class="part-label">Rollout</p>
+
+    <!-- FIG 9 -->
+    <section class="fig" id="rollout">
+      <div class="eyebrow">Fig 09 · phases and exit gates</div>
+      <h3>Behaviour only changes for services that opt in, until the major release in Phase 4</h3>
+      <figure>
+        <div class="scroll">
+          <svg class="dg" viewBox="0 0 900 280" role="img" aria-label="Five phases left to right: visibility, retry and DLQ, delay tiers, adoption, default on. Exit gates between them: one week of loss data, pilot in test and production, a real DLQ batch redriven, all consumers enabled.">
+            <g>
+              <rect class="box" x="20" y="30" width="160" height="134" rx="8"/>
+              <text class="cap" x="34" y="54">PHASE 0</text>
+              <text class="b" x="34" y="78" style="font-size:15px">Visibility</text>
+              <text class="s" x="34" y="102">Log real error class</text>
+              <text class="s" x="34" y="120">Count failures</text>
+              <text class="ms" x="34" y="150">patch · no change</text>
+
+              <rect class="box" x="192" y="30" width="160" height="134" rx="8"/>
+              <text class="cap" x="206" y="54">PHASE 1</text>
+              <text class="b" x="206" y="78" style="font-size:15px">Retry + DLQ</text>
+              <text class="s" x="206" y="102">Fix error propagation</text>
+              <text class="s" x="206" y="120">Inline retry + DLQ</text>
+              <text class="ms" x="206" y="150">minor · opt-in</text>
+
+              <rect class="box" x="364" y="30" width="160" height="134" rx="8"/>
+              <text class="cap" x="378" y="54">PHASE 2</text>
+              <text class="b" x="378" y="78" style="font-size:15px">Delay tiers</text>
+              <text class="s" x="378" y="102">1m and 10m topics</text>
+              <text class="s" x="378" y="120">Redrive CLI, alerts</text>
+              <text class="ms" x="378" y="150">minor · opt-in</text>
+
+              <rect class="box" x="536" y="30" width="160" height="134" rx="8"/>
+              <text class="cap" x="550" y="54">PHASE 3</text>
+              <text class="b" x="550" y="78" style="font-size:15px">Adoption</text>
+              <text class="s" x="550" y="102">Idempotency checks</text>
+              <text class="s" x="550" y="120">Enable per service</text>
+              <text class="ms" x="550" y="150">service PRs</text>
+
+              <rect class="accbox" x="708" y="30" width="160" height="134" rx="8"/>
+              <text class="cap" x="722" y="54">PHASE 4</text>
+              <text class="b" x="722" y="78" style="font-size:15px">Default on</text>
+              <text class="s" x="722" y="102">On for all consumers</text>
+              <text class="s" x="722" y="120">SQS tracing rethrow</text>
+              <text class="ms" x="722" y="150">major</text>
+            </g>
+            <line class="rule" x1="20" y1="196" x2="868" y2="196"/>
+            <text class="cap" x="20" y="226">EXIT GATES</text>
+            <g>
+              <path class="warnbox" d="M186 188 L194 196 L186 204 L178 196 Z"/>
+              <text class="s" x="186" y="226" text-anchor="middle" style="fill: var(--fg)">1 week of</text>
+              <text class="s" x="186" y="242" text-anchor="middle" style="fill: var(--fg)">loss data</text>
+              <path class="warnbox" d="M358 188 L366 196 L358 204 L350 196 Z"/>
+              <text class="s" x="358" y="226" text-anchor="middle" style="fill: var(--fg)">Pilot: 2 wk TEST</text>
+              <text class="s" x="358" y="242" text-anchor="middle" style="fill: var(--fg)">+ 1 wk production</text>
+              <path class="warnbox" d="M530 188 L538 196 L530 204 L522 196 Z"/>
+              <text class="s" x="530" y="226" text-anchor="middle" style="fill: var(--fg)">Real DLQ batch</text>
+              <text class="s" x="530" y="242" text-anchor="middle" style="fill: var(--fg)">redriven end to end</text>
+              <path class="warnbox" d="M702 188 L710 196 L702 204 L694 196 Z"/>
+              <text class="s" x="702" y="226" text-anchor="middle" style="fill: var(--fg)">All consumers</text>
+              <text class="s" x="702" y="242" text-anchor="middle" style="fill: var(--fg)">enabled</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Phase 0 tells us how many messages are lost today before anything changes. Phase 1 ships the propagation fix and bounded retries together (fig 02). The SQS tracing fix waits for Phase 4 because it will surface redeliveries that are hidden today.</figcaption>
+      </figure>
+    </section>
+  </main>
+</div>

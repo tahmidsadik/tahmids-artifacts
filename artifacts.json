@@ -1,5 +1,12 @@
 [
   {
+    "slug": "kafka-retry-diagrams",
+    "title": "Kafka Retry Diagrams",
+    "summary": "Diagrams for the Kafka consumer retry and dead-letter proposal in @emilgroup/core, from today's swallowed errors to the phased rollout.",
+    "date": "2026-10-28",
+    "updated": "2026-10-28"
+  },
+  {
     "slug": "software-factory-integrations",
     "title": "Software Factory Architecture",
     "summary": "How agents and humans share one software factory: work item lifecycle, gates, claims, configurable human/agent reviews, incident fast track, and provider-agnostic ports for Jira, Bitbucket, CI, deployments and alerts.",
