@@ -2,9 +2,9 @@
   {
     "slug": "software-factory-integrations",
     "title": "Software Factory Architecture",
-    "summary": "How agents and humans share one software factory: work item lifecycle, gates, claims, reviews, incident fast track, and provider-agnostic ports for Jira, Bitbucket, CI, deployments and alerts.",
+    "summary": "How agents and humans share one software factory: work item lifecycle, gates, claims, configurable human/agent reviews, incident fast track, and provider-agnostic ports for Jira, Bitbucket, CI, deployments and alerts.",
     "date": "2026-10-27",
-    "updated": "2026-10-27"
+    "updated": "2026-10-28"
   },
   {
     "slug": "product-document-versions",

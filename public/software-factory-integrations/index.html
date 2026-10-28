@@ -138,12 +138,21 @@ Cancelled: from any open stage, humans only.</div>
     <div class="card"><strong>Compare-and-swap</strong><span class="muted">Every change bumps <code>version</code>, and mutations send <code>expected_version</code>. A stale write gets <code>409 Conflict</code>, so the caller refetches and retries.</span></div>
     <div class="card"><strong>Finding work</strong><span class="muted">An idle agent searches <code>claimable_by: implementer</code> and claims the first hit. If it loses the race, it moves on to the next item.</span></div>
     <div class="card"><strong>Identity from the token</strong><span class="muted">The server derives the acting <code>Actor</code> from the bearer token, so an agent can't act as a human.</span></div>
-    <div class="card"><strong>Policy per project</strong><span class="muted">Whether a human must approve scope, how many human and agent approvals are needed, and the severity from which incidents are fast-tracked.</span></div>
+    <div class="card"><strong>Policy per project</strong><span class="muted">Whether a human must approve scope, the review policy (default, issue overrides, floor), and the severity from which incidents are fast-tracked.</span></div>
   </div>
 
   <h2 id="reviews">6. Reviews</h2>
   <ul>
-    <li>Agents and humans both review. The default policy needs <strong>1 human and 1 agent approval</strong>.</li>
+    <li><strong>Configurable per work item:</strong> <em>human only</em>, <em>agent only</em> or <em>human + agent</em>, each with an approval count. The project default is 1 human + 1 agent.</li>
+    <li><strong>Resolved from signals</strong>, most specific first:
+      <ol>
+        <li>The <strong>project default</strong> applies when there are no other signals.</li>
+        <li><strong>Repository settings</strong> (a <code>[review]</code> section in the repo's factory config, or the host's branch restrictions) replace the default. When the work spans several repos, the strictest setting wins.</li>
+        <li>An <strong>issue signal</strong>, such as the Jira label <code>review:agent-only</code>, <code>review:human-only:2</code> or <code>review:human+agent</code>, or a custom field, replaces those if the project allows it.</li>
+        <li><strong>Enforced</strong> repository settings (e.g. a production service always needs a human) and the project <strong>floor</strong> are minimums. A ticket can't loosen them.</li>
+      </ol>
+      The work item stores the result together with its signals and a one-line explanation, e.g. <code>repository settings: 2 human approval(s); issue override: 1 agent approval(s); raised to meet minimum 1 human approval(s)</code>.</li>
+    <li>Human change requests always block. Agent change requests block only when agent approvals are required; under <em>human only</em>, agent reviews are advisory.</li>
     <li><strong>No self-review:</strong> anyone who implemented the work can't review it or claim its review.</li>
     <li><strong>Revisions:</strong> every re-entry into review starts a new revision. Approvals, CI and quality results from earlier revisions stop counting.</li>
     <li>A reviewer's latest verdict wins. A <code>Comment</code> never overrides an approval or a change request.</li>
@@ -230,7 +239,7 @@ GET  /v1/events?since={seq}                      work_item_updated, agent_run_up
 
   <h2 id="roadmap">14. Roadmap</h2>
   <ol>
-    <li>✅ <code>factory-core</code> and <code>factory-api</code>: model, ports, workflow, contract (29 tests).</li>
+    <li>✅ <code>factory-core</code> and <code>factory-api</code>: model, ports, workflow, contract (35 tests).</li>
     <li><code>factory-jira</code> and the <code>factory jira</code> CLI: reads first, then transitions and comments.</li>
     <li><code>factory-bitbucket</code>: PRs, pipelines, commit statuses.</li>
     <li><code>factory-server</code>: SQLite store, REST and events. It runs on the fake adapters first, then the real ones.</li>
@@ -242,7 +251,6 @@ GET  /v1/events?since={seq}                      work_item_updated, agent_run_up
 
   <h2 id="questions">15. Open questions</h2>
   <div class="card q">Which monitoring should be the first <code>AlertSource</code> for EIS: CloudWatch, Sentry, or Kubernetes health checks?</div>
-  <div class="card q">Should the default review policy be 1 human + 1 agent for everything, or should chores and docs be allowed agent-only review?</div>
   <div class="card q">Should a factory work item be written back to Jira (status transitions, comments with links to PRs), or should Jira only be read from at first?</div>
   <div class="card q">Agent isolation: a git worktree per work item on the host, or a container per run from the start?</div>
 </main>
