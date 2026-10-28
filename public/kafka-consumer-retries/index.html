@@ -1,0 +1,1185 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta charset="utf-8">
+<title>Kafka Consumer Retries</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Draft design: inline retries, then per-service SQS retry queues and DLQs for Kafka consumers in @emilgroup/core.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of animated "stages". Each stage is a figure with a live narration line and its own play controls. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --fg: #141a21;
+  --muted: #586473;
+  --rule: #d9dee4;
+  --line: #8c96a3;
+  --accent: #0a6f6a;
+  --good: #1d7f46;
+  --bad: #c0362c;
+  --warn: #a8670d;
+  --tk-ink: #ffffff;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+    --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; --tk-ink: #0f1317; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1317; --surface: #171c22; --fg: #e6eaef; --muted: #9aa5b2; --rule: #2a313a; --line: #6f7a87;
+  --accent: #3cc0b5; --good: #4cc38a; --bad: #f2756a; --warn: #e3a64a; --tk-ink: #0f1317; color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.page {
+  max-width: 1000px; margin: 0 auto;
+  padding-block: 40px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 64px;
+}
+.page > * { min-width: 0; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+
+/* Hero */
+.eyebrow { font: 600 11px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+h1 { font: 700 clamp(32px, 5vw, 48px)/1.05 var(--font-display); letter-spacing: -.015em; margin: 0 0 14px; text-wrap: balance; }
+.lede { margin: 0; max-width: 62ch; font-size: 17px; color: var(--fg); }
+.meta { margin: 12px 0 0; font-size: 13.5px; color: var(--muted); }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); font-size: 12px; margin-left: 6px; }
+.agreed { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .agreed { grid-template-columns: minmax(0, 1fr); } }
+.agreed div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.agreed b { display: block; font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.agreed span { font-size: 14px; }
+.toc { margin: 24px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 13.5px; }
+.toc a { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rule); color: var(--fg); text-decoration: none; background: var(--surface); }
+.toc a:hover { border-color: var(--accent); }
+
+/* Sections */
+section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+section > * { min-width: 0; }
+.kicker { font: 600 11px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h2 { font: 700 28px/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+h3 { font: 600 18px/1.3 var(--font-display); margin: 8px 0 0; text-wrap: balance; }
+section > p { margin: 0; max-width: 68ch; }
+
+/* Stage */
+.stage { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.stage-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.stage-top .lbl { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 13px/1 var(--font-body); color: var(--fg); background: transparent; border: 0; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-weight: 600; }
+.scroll { overflow-x: auto; padding: 16px 16px 8px; }
+.stage-bar { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-top: 1px solid var(--rule); background: color-mix(in srgb, var(--bg) 55%, var(--surface)); }
+.say { margin: 0; flex: 1; min-width: 0; font-size: 14px; min-height: 2.9em; display: flex; align-items: center; }
+.ctl { display: flex; gap: 6px; flex: none; }
+.ctl button { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--fg); cursor: pointer; }
+.ctl button:hover { border-color: var(--accent); color: var(--accent); }
+.ctl svg { width: 14px; height: 14px; fill: currentColor; }
+.ctl [data-act="play"] .i-pause, .ctl [data-act="play"].on .i-play { display: none; }
+.ctl [data-act="play"].on .i-pause { display: block; }
+.chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 700px) { .chips { grid-template-columns: minmax(0, 1fr); } }
+.chips > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.chips h4 { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.chips ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.chips li { padding-left: 18px; position: relative; }
+.chips li::before { content: ""; position: absolute; left: 0; top: .55em; width: 8px; height: 8px; border-radius: 2px; background: var(--line); }
+.chips .plus li::before { background: var(--good); }
+.chips .minus li::before { background: var(--warn); }
+
+/* Diagram classes */
+svg.dg { display: block; width: 100%; height: auto; min-width: 720px; font-family: var(--font-body); }
+.dg text { fill: var(--fg); font-size: 13px; }
+.dg text.s { font-size: 11.5px; fill: var(--muted); }
+.dg text.m { font-family: var(--font-mono); font-size: 12px; }
+.dg text.ms { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.dg text.b { font-weight: 600; }
+.dg text.big { font: 600 20px var(--font-mono); }
+.dg text.cap { font-size: 10.5px; letter-spacing: .08em; fill: var(--muted); }
+.dg text.tbad { fill: var(--bad); }
+.dg text.tgood { fill: var(--good); }
+.dg text.tacc { fill: var(--accent); }
+.dg text.twarn { fill: var(--warn); }
+.dg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+.dg .dim { fill: var(--bg); stroke: var(--rule); stroke-width: 1.25; }
+.dg .badbox { fill: color-mix(in srgb, var(--bad) 11%, var(--surface)); stroke: var(--bad); stroke-width: 1.5; }
+.dg .goodbox { fill: color-mix(in srgb, var(--good) 11%, var(--surface)); stroke: var(--good); stroke-width: 1.5; }
+.dg .accbox { fill: color-mix(in srgb, var(--accent) 10%, var(--surface)); stroke: var(--accent); stroke-width: 1.5; }
+.dg .ln { fill: none; stroke: var(--line); stroke-width: 1.25; }
+.dg .ln-bad { fill: none; stroke: var(--bad); stroke-width: 1.25; }
+.dg .ln-acc { fill: none; stroke: var(--accent); stroke-width: 1.4; }
+.dg .ln-faint { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+.dg .dash { stroke-dasharray: 5 4; }
+.dg .rule { stroke: var(--rule); stroke-width: 1; }
+.dg .band-bad { fill: color-mix(in srgb, var(--bad) 9%, transparent); }
+.dg .seg-blk { fill: color-mix(in srgb, var(--bad) 28%, var(--surface)); stroke: var(--bad); stroke-width: 1; }
+.dg .seg-wait { fill: color-mix(in srgb, var(--accent) 12%, var(--surface)); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; }
+.dg .try { fill: var(--fg); }
+.dg .try-ok { fill: var(--good); }
+.dg .try-dlq { fill: var(--bad); }
+.dg .ph { stroke: var(--accent); stroke-width: 2; }
+.dg .barbg { fill: var(--bg); stroke: var(--rule); }
+.dg .barbad { fill: var(--bad); }
+.dg .baracc { fill: var(--accent); }
+.dg .ring-t { fill: none; stroke: var(--rule); stroke-width: 3; }
+.dg .ring-p { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.dg .ring-p.full { stroke: var(--good); }
+.dg .mk { fill: var(--line); }
+.dg .mk-bad { fill: var(--bad); }
+.dg .mk-acc { fill: var(--accent); }
+/* states the animations toggle */
+.dg rect, .dg polygon { transition: fill .25s, stroke .25s; }
+.dg .st-bad { fill: color-mix(in srgb, var(--bad) 18%, var(--surface)); stroke: var(--bad); }
+.dg .st-good { fill: color-mix(in srgb, var(--good) 18%, var(--surface)); stroke: var(--good); }
+.dg .st-acc { fill: color-mix(in srgb, var(--accent) 18%, var(--surface)); stroke: var(--accent); }
+.dg .st-warn { fill: color-mix(in srgb, var(--warn) 18%, var(--surface)); stroke: var(--warn); }
+.dg .st-done { fill: var(--bg); stroke: var(--rule); }
+.dg .st-lost { fill: color-mix(in srgb, var(--bad) 8%, var(--bg)); stroke: var(--bad); stroke-dasharray: 4 3; }
+.dg .st-wait { stroke: var(--warn); stroke-width: 2; }
+/* moving tokens */
+.dg .tk circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.dg .tk.bad circle { fill: var(--bad); }
+.dg .tk.good circle { fill: var(--good); }
+.dg .tk.warn circle { fill: var(--warn); }
+.dg .tk text { font: 600 9.5px var(--font-mono); fill: var(--tk-ink); text-anchor: middle; dominant-baseline: central; }
+.dg .card rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+.dg .card text { font: 500 11px var(--font-mono); fill: var(--fg); text-anchor: middle; dominant-baseline: central; }
+.running .rest { visibility: hidden; }
+figure[data-mode="per"] .sharedq, figure[data-mode="shared"] .perq { display: none; }
+
+/* Message anatomy */
+.anatomy { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; }
+@media (max-width: 760px) { .anatomy { grid-template-columns: minmax(0, 1fr); } }
+.anatomy > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; min-width: 0; overflow: hidden; }
+.anatomy h4 { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--rule); font: 600 11px/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.anatomy h4 em { font-style: normal; letter-spacing: 0; text-transform: none; font-weight: 500; }
+.anatomy pre { margin: 0; padding: 14px 16px; font: 12.5px/1.65 var(--font-mono); overflow-x: auto; }
+.k-o { color: var(--fg); } .k-r { color: var(--accent); } .k-t { color: var(--warn); } .k-e { color: var(--bad); } .k-m { color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* Opt-in steps and rollout */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: s; }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.steps li { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; min-width: 0; counter-increment: s; display: grid; gap: 6px; align-content: start; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--tk-ink); font: 600 12px var(--font-mono); }
+.steps b { font-size: 14px; }
+.steps span { font-size: 13px; color: var(--muted); }
+.steps code { overflow-wrap: anywhere; }
+.phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 860px) { .phases { grid-template-columns: minmax(0, 1fr); } }
+.phases div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; min-width: 0; display: grid; gap: 6px; align-content: start; }
+.phases .n { font: 600 12px var(--font-mono); color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.phases .rel { color: var(--accent); }
+.phases .rel.major { color: var(--warn); }
+.phases b { font-size: 14px; }
+.phases span { font-size: 13px; }
+.phases .gate { font-size: 12.5px; color: var(--muted); border-top: 1px dashed var(--rule); padding-top: 6px; }
+.questions { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; max-width: 72ch; }
+.questions li { padding: 10px 14px 10px 40px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; position: relative; font-size: 14.5px; }
+.questions li::before { content: ""; position: absolute; left: 14px; top: 14px; width: 12px; height: 12px; border: 1.5px solid var(--line); border-radius: 3px; }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk" style="fill:var(--line)"/></marker>
+    <marker id="ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+    <marker id="ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <header>
+    <p class="eyebrow">Draft design · @emilgroup/core Kafka module</p>
+    <h1>Kafka consumer retries</h1>
+    <p class="lede">Today a Kafka handler that throws loses its message. This draft retries it in place first, then parks it in the service's own SQS queues until it succeeds or someone acts on it.</p>
+    <p class="meta">28 Oct 2026 · Tahmid Sadik <span class="pill">Draft, written doc to follow</span></p>
+    <div class="agreed" aria-label="Agreed so far">
+      <div><b>Agreed · 1</b><span>Hybrid: retry inline first. Attempts are configurable, default 3.</span></div>
+      <div><b>Agreed · 2</b><span>Then SQS: one retry queue and one DLQ per service, with long waits or manual redrive.</span></div>
+      <div><b>Agreed · 3</b><span>Kafka messages and handlers stay unchanged. Services opt in.</span></div>
+    </div>
+    <ul class="toc">
+      <li><a href="#problem">The problem</a></li>
+      <li><a href="#options">Options</a></li>
+      <li><a href="#wait">Where retries wait</a></li>
+      <li><a href="#design">Final design</a></li>
+      <li><a href="#multi">Many consumers</a></li>
+      <li><a href="#message">The SQS message</a></li>
+      <li><a href="#optin">Opting in</a></li>
+      <li><a href="#rollout">Rollout</a></li>
+      <li><a href="#open">Open questions</a></li>
+    </ul>
+  </header>
+
+  <!-- ============ PROBLEM ============ -->
+  <section id="problem">
+    <p class="kicker">The problem</p>
+    <h2>A failing handler loses its message</h2>
+    <p>NestJS turns the handler's error into an Observable that nothing subscribes to, so the consumer thinks the message succeeded.</p>
+
+    <figure class="stage" id="fig-today">
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 262" role="img" aria-label="Offsets 41 and 43 succeed. Offset 42 fails in the handler, NestJS sends the error into an Observable with no subscriber, the consumer sees success and commits 42. The message is lost.">
+          <text class="cap" x="30" y="40">ACCOUNT.EVENTS · PARTITION 2</text>
+          <text class="m b" x="880" y="40" text-anchor="end" id="s1-lost" data-k>lost: 0</text>
+          <g>
+            <rect id="s1-o40" class="dim" x="30" y="58" width="40" height="36" rx="5"/><text class="ms" x="50" y="81" text-anchor="middle">40</text>
+            <rect id="s1-o41" class="box" x="78" y="58" width="40" height="36" rx="5"/><text class="ms" x="98" y="81" text-anchor="middle">41</text>
+            <rect id="s1-o42" class="box" x="126" y="58" width="40" height="36" rx="5"/><text class="ms" x="146" y="81" text-anchor="middle">42</text>
+            <rect id="s1-o43" class="box" x="174" y="58" width="40" height="36" rx="5"/><text class="ms" x="194" y="81" text-anchor="middle">43</text>
+            <rect id="s1-o44" class="box" x="222" y="58" width="40" height="36" rx="5"/><text class="ms" x="242" y="81" text-anchor="middle">44</text>
+            <rect id="s1-o45" class="box" x="270" y="58" width="40" height="36" rx="5"/><text class="ms" x="290" y="81" text-anchor="middle">45</text>
+          </g>
+          <text class="s" x="30" y="118">grey = committed</text>
+          <path class="ln" d="M312 76H348" marker-end="url(#ah)"/>
+          <path class="ln" d="M500 76H558" marker-end="url(#ah)"/>
+          <path class="ln" d="M720 76H773" marker-end="url(#ah)"/>
+          <path class="ln-bad dash" d="M827 100V215H722" marker-end="url(#ah-bad)"/>
+          <text class="s tbad" x="836" y="160">throws</text>
+          <rect id="s1-cons" class="box" x="350" y="52" width="150" height="48" rx="8"/>
+          <text class="b" x="425" y="73" text-anchor="middle">Kafka consumer</text>
+          <text class="ms" x="425" y="90" text-anchor="middle">eachMessage</text>
+          <rect id="s1-nest" class="box" x="560" y="52" width="160" height="48" rx="8"/>
+          <text class="b" x="640" y="73" text-anchor="middle">NestJS</text>
+          <text class="ms" x="640" y="90" text-anchor="middle">handleEvent</text>
+          <rect id="s1-hand" class="box" x="775" y="52" width="105" height="48" rx="8"/>
+          <text class="b" x="827" y="81" text-anchor="middle">Handler</text>
+          <rect id="s1-void" class="dim dash" x="560" y="188" width="160" height="54" rx="8"/>
+          <text x="640" y="211" text-anchor="middle">Observable</text>
+          <text class="s" x="640" y="228" text-anchor="middle">no subscriber</text>
+          <text class="ms tbad" x="640" y="140" text-anchor="middle" id="s1-log" data-k></text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">Offset 42 fails in the handler, but the consumer still commits it.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+
+    <h3>Fixing only the swallowed error creates a hot loop</h3>
+    <p>If the error reaches the consumer, the Kafka client seeks back and re-reads the same message immediately, with no backoff and no limit.</p>
+
+    <figure class="stage" id="fig-loop">
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 250" role="img" aria-label="With only error propagation fixed, message 42 is re-read immediately and forever; messages 43 to 47 wait behind it and lag grows.">
+          <text class="m b" x="880" y="28" text-anchor="end" id="s2-att" data-k>attempts on 42: 0</text>
+          <rect class="dim" x="30" y="60" width="38" height="36" rx="5"/><text class="ms" x="49" y="83" text-anchor="middle">40</text>
+          <rect class="dim" x="76" y="60" width="38" height="36" rx="5"/><text class="ms" x="95" y="83" text-anchor="middle">41</text>
+          <rect id="s2-o42" class="box" x="122" y="60" width="38" height="36" rx="5"/><text class="ms" x="141" y="83" text-anchor="middle">42</text>
+          <rect id="s2-o43" class="box" x="168" y="60" width="38" height="36" rx="5"/><text class="ms" x="187" y="83" text-anchor="middle">43</text>
+          <rect id="s2-o44" class="box" x="214" y="60" width="38" height="36" rx="5"/><text class="ms" x="233" y="83" text-anchor="middle">44</text>
+          <rect id="s2-o45" class="box" x="260" y="60" width="38" height="36" rx="5"/><text class="ms" x="279" y="83" text-anchor="middle">45</text>
+          <rect id="s2-o46" class="box" x="306" y="60" width="38" height="36" rx="5"/><text class="ms" x="325" y="83" text-anchor="middle">46</text>
+          <rect id="s2-o47" class="box" x="352" y="60" width="38" height="36" rx="5"/><text class="ms" x="371" y="83" text-anchor="middle">47</text>
+          <path class="ln" d="M141 60V34H505V52" marker-end="url(#ah)"/>
+          <text class="s" x="320" y="28" text-anchor="middle">read</text>
+          <path class="ln" d="M580 78H698" marker-end="url(#ah)"/>
+          <path class="ln-bad dash" d="M775 102V150H141V98" marker-end="url(#ah-bad)"/>
+          <text class="s tbad" x="460" y="168" text-anchor="middle">error → seek back to 42</text>
+          <rect id="s2-cons" class="box" x="430" y="54" width="150" height="48" rx="8"/>
+          <text class="b" x="505" y="75" text-anchor="middle">Kafka consumer</text>
+          <text class="ms" x="505" y="92" text-anchor="middle">no retry limit</text>
+          <rect id="s2-hand" class="box" x="700" y="54" width="150" height="48" rx="8"/>
+          <text class="b" x="775" y="83" text-anchor="middle">Handler</text>
+          <text class="s" x="30" y="214">waiting behind 42</text>
+          <rect class="barbg" x="150" y="204" width="400" height="12" rx="3"/>
+          <rect id="s2-lag" class="barbad" x="150" y="204" width="40" height="12" rx="3"/>
+          <text class="ms" x="562" y="214" id="s2-lagt" data-k>5 messages</text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">Message 42 is re-read forever, and everything behind it waits.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <!-- ============ OPTIONS ============ -->
+  <section id="options">
+    <p class="kicker">Options</p>
+    <h2>Where a failing message waits</h2>
+    <p>Each lane is one approach. Red blocks the partition; teal waits somewhere else while the partition keeps moving.</p>
+
+    <figure class="stage" id="fig-options">
+      <div class="stage-top">
+        <span class="lbl">Downstream</span>
+        <div class="seg" role="group" aria-label="Scenario">
+          <button type="button" data-sc="outage" aria-pressed="true">Down for 5 minutes</button>
+          <button type="button" data-sc="blip" aria-pressed="false">Down for 50 ms</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 290" role="img" aria-label="Timeline per approach. During a 5-minute outage, blocking retry holds the partition for 4 minutes then dead-letters; retry topics and database retry recover at 11 minutes; the hybrid holds the partition 2.6 seconds and recovers at 11 minutes. During a 50 ms blip, blocking and hybrid recover at 0.2 s while topic and database retries wait a minute.">
+          <rect id="s3-band" class="band-bad" x="230" y="50" width="200" height="200"/>
+          <text id="s3-bandt" class="s tbad" x="234" y="44">downstream down</text>
+          <g id="s3-grid"></g>
+          <text class="b" x="20" y="75">A · Blocking retry</text>
+          <text class="b" x="20" y="125">B · Retry topics only</text>
+          <text class="b" x="20" y="175">C · Database retry</text>
+          <text class="b tacc" x="20" y="225">Hybrid (chosen)</text>
+          <text class="s" id="s3-o0" x="20" y="91"></text>
+          <text class="s" id="s3-o1" x="20" y="141"></text>
+          <text class="s" id="s3-o2" x="20" y="191"></text>
+          <text class="s" id="s3-o3" x="20" y="241"></text>
+          <g id="s3-lanes"></g>
+          <line id="s3-ph" class="ph" x1="230" x2="230" y1="50" y2="250" style="opacity:0"/>
+          <rect class="seg-blk" x="610" y="12" width="14" height="10"/><text class="s" x="630" y="21">blocks the partition</text>
+          <rect class="seg-wait" x="752" y="12" width="14" height="10"/><text class="s" x="772" y="21">waits elsewhere</text>
+          <circle class="try" cx="540" cy="17" r="3.5"/><text class="s" x="548" y="21">attempt</text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">The hybrid is the only option that handles both a blip and a long outage well.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <!-- ============ WHERE RETRIES WAIT ============ -->
+  <section id="wait">
+    <p class="kicker">Where retries wait</p>
+    <h2>Kafka retry topics or SQS?</h2>
+    <p>A Kafka partition is read in order, so a delayed message at the head holds up everything behind it. An SQS message has its own timer.</p>
+
+    <figure class="stage" id="fig-wait">
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 270" role="img" aria-label="Three failed messages: X due at 10:10, Y at 10:01, Z at 10:02. In one Kafka retry topic Y and Z wait behind X and are 8 to 9 minutes late. In SQS each leaves on time.">
+          <text class="big" x="450" y="30" text-anchor="middle" id="s4-clock" data-k>10:00</text>
+          <text class="s" x="450" y="47" text-anchor="middle">time compressed</text>
+          <text class="b" x="30" y="80">One Kafka retry topic</text>
+          <text class="s" x="30" y="98">read strictly in order</text>
+          <rect class="dim" x="30" y="112" width="290" height="44" rx="8"/>
+          <g class="rest">
+            <g class="card" transform="translate(270 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>X · 10:10</text></g>
+            <g class="card" transform="translate(175 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>Y · 10:01</text></g>
+            <g class="card" transform="translate(80 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>Z · 10:02</text></g>
+          </g>
+          <path class="ln" d="M320 134H343" marker-end="url(#ah)"/>
+          <rect id="s4-cons" class="box" x="345" y="110" width="85" height="48" rx="8"/>
+          <text class="b" x="387" y="138" text-anchor="middle">Consumer</text>
+          <text class="s" x="30" y="188" id="s4-ks" data-k>Head X is not due yet</text>
+          <text class="s tbad" x="30" y="208" id="s4-kl" data-k></text>
+          <text class="s" x="30" y="252">Fix: one topic per delay, plus a pause/resume consumer</text>
+
+          <text class="b" x="470" y="80">SQS retry queue</text>
+          <text class="s" x="470" y="98">each message has its own timer</text>
+          <rect class="dim" x="470" y="112" width="290" height="44" rx="8"/>
+          <g class="rest">
+            <g class="card" transform="translate(518 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>Y · 10:01</text></g>
+            <g class="card" transform="translate(613 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>Z · 10:02</text></g>
+            <g class="card" transform="translate(710 134)"><rect x="-40" y="-14" width="80" height="28" rx="6"/><text>X · 10:10</text></g>
+          </g>
+          <path class="ln" d="M760 134H788" marker-end="url(#ah)"/>
+          <rect id="s4-hand" class="box" x="790" y="110" width="90" height="48" rx="8"/>
+          <text class="b" x="835" y="138" text-anchor="middle">Handler</text>
+          <text class="s tgood" x="470" y="208" id="s4-ss" data-k></text>
+          <text class="s" x="470" y="252">SQS supports waits of up to 12 hours per message</text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">In one Kafka topic, Y and Z leave 8 to 9 minutes late. In SQS every message leaves on time.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+
+    <div class="chips">
+      <div class="plus"><h4>SQS gives us</h4><ul>
+        <li>A wait per message, up to 12 h</li>
+        <li>Built-in DLQ and redrive</li>
+        <li>Queue-depth alarms in CloudWatch</li>
+        <li>No extra Kafka topics or partitions</li>
+      </ul></div>
+      <div class="minus"><h4>SQS costs us</h4><ul>
+        <li>14-day maximum retention</li>
+        <li>1 MiB messages, 10 attributes</li>
+        <li>Reading a message hides it for a while</li>
+        <li>Queues and IAM set up per service</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ============ FINAL DESIGN ============ -->
+  <section id="design">
+    <p class="kicker">Final design</p>
+    <h2>Retry in place, then wait in SQS</h2>
+    <p>Pick a case or let them cycle. Times are compressed.</p>
+
+    <figure class="stage" id="fig-life">
+      <div class="stage-top">
+        <span class="lbl">Case</span>
+        <div class="seg" role="group" aria-label="Case">
+          <button type="button" data-sc="blip" aria-pressed="true">Short blip</button>
+          <button type="button" data-sc="outage" aria-pressed="false">10-min outage</button>
+          <button type="button" data-sc="poison" aria-pressed="false">Always fails</button>
+          <button type="button" data-sc="malformed" aria-pressed="false">Malformed</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 392" role="img" aria-label="Lifecycle: Kafka topic to dispatch to handler. Failures retry inline up to three times. Then, if attempts are left, the message goes to the service's SQS retry queue and comes back through dispatch when due. With no attempts left it goes to the service's DLQ, where it can be redriven to the retry queue. Malformed messages go straight to the DLQ.">
+          <text class="ms" x="20" y="28" id="s6-clock" data-k>t = 0 s</text>
+          <path class="ln" d="M150 85H218" marker-end="url(#ah)"/>
+          <path class="ln" d="M370 85H448" marker-end="url(#ah)"/>
+          <path class="ln" d="M590 85H678" marker-end="url(#ah)"/>
+          <text class="s tgood" x="634" y="78" text-anchor="middle">ok</text>
+          <path class="ln-bad" d="M560 60C560 22 480 22 480 58" marker-end="url(#ah-bad)"/>
+          <text class="ms tbad" x="572" y="34" id="s6-inl" data-k>inline retry ×3</text>
+          <path class="ln-bad" d="M520 110V245" marker-end="url(#ah-bad)"/>
+          <text class="s tbad" x="528" y="150">still failing</text>
+          <path class="ln dash" d="M240 110V222H785V248" marker-end="url(#ah)"/>
+          <text class="s" x="250" y="216">malformed: no retries</text>
+          <polygon id="s6-dec" class="box" points="460,282 520,247 580,282 520,317"/>
+          <text class="s" x="520" y="279" text-anchor="middle">attempts</text>
+          <text class="s" x="520" y="293" text-anchor="middle">left?</text>
+          <path class="ln-acc" d="M460 282H412" marker-end="url(#ah-acc)"/>
+          <text class="s tacc" x="436" y="274" text-anchor="middle">yes</text>
+          <path class="ln-bad" d="M580 282H688" marker-end="url(#ah-bad)"/>
+          <text class="s tbad" x="634" y="274" text-anchor="middle">no</text>
+          <path class="ln-acc" d="M305 250V112" marker-end="url(#ah-acc)"/>
+          <text class="s tacc" x="312" y="160">when due</text>
+          <path class="ln-acc dash" d="M785 316V366H305V318" marker-end="url(#ah-acc)"/>
+          <text class="s tacc" x="545" y="382" text-anchor="middle">redrive from the CLI after a fix</text>
+
+          <rect id="s6-kafka" class="box" x="20" y="60" width="130" height="50" rx="8"/>
+          <text class="b" x="85" y="82" text-anchor="middle">Kafka topic</text>
+          <text class="s" x="85" y="99" text-anchor="middle">billing's copy</text>
+          <rect id="s6-disp" class="box" x="220" y="60" width="150" height="50" rx="8"/>
+          <text class="m b" x="295" y="82" text-anchor="middle">dispatch()</text>
+          <text class="s" x="295" y="99" text-anchor="middle">shared path</text>
+          <rect id="s6-hand" class="box" x="450" y="60" width="140" height="50" rx="8"/>
+          <text class="b" x="520" y="90" text-anchor="middle">Handler</text>
+          <rect id="s6-ack" class="box" x="680" y="60" width="200" height="50" rx="8"/>
+          <text class="b" x="780" y="82" text-anchor="middle" id="s6-ackt" data-k>Commit or delete</text>
+          <text class="s" x="780" y="99" text-anchor="middle" id="s6-acks" data-k>done</text>
+          <rect id="s6-q" class="accbox" x="200" y="250" width="210" height="66" rx="8"/>
+          <text class="m b" x="305" y="274" text-anchor="middle">billing-kafka-retry</text>
+          <text class="s" x="305" y="292" text-anchor="middle" id="s6-qt" data-k>1 min → 10 min → 1 h → 6 h</text>
+          <rect class="barbg" x="215" y="301" width="180" height="5" rx="2"/>
+          <rect id="s6-qbar" class="baracc" x="215" y="301" width="0" height="5" rx="2"/>
+          <rect id="s6-dlq" class="badbox" x="690" y="250" width="190" height="66" rx="8"/>
+          <text class="m b" x="785" y="276" text-anchor="middle">billing-kafka-dlq</text>
+          <text class="s" x="785" y="295" text-anchor="middle" id="s6-dt" data-k>alerts the team</text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">Every failure ends in a success or the service's DLQ, never in silence.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+
+    <h3>Two pollers, one dispatch path</h3>
+    <p>Core runs an SQS poller next to the Kafka consumer. Both call the same <code>dispatch()</code>, so handlers can't tell where a message came from.</p>
+
+    <figure class="stage" id="fig-pollers">
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 290" role="img" aria-label="The Kafka consumer and the SQS retry poller both feed dispatch(), which parses the message, finds the handler, builds auth and request context, and calls the handler. Kafka deliveries then commit the offset; SQS deliveries delete the SQS message.">
+          <path class="ln" d="M190 65H278" marker-end="url(#ah)"/>
+          <path class="ln-acc" d="M190 235H278" marker-end="url(#ah-acc)"/>
+          <path class="ln" d="M580 150H648" marker-end="url(#ah)"/>
+          <path class="ln" d="M765 125V82" marker-end="url(#ah)"/>
+          <path class="ln" d="M765 175V218" marker-end="url(#ah)"/>
+          <rect id="s7-kc" class="box" x="20" y="40" width="170" height="50" rx="8"/>
+          <text class="b" x="105" y="62" text-anchor="middle">Kafka consumer</text>
+          <text class="ms" x="105" y="79" text-anchor="middle">eachMessage</text>
+          <rect id="s7-sp" class="accbox" x="20" y="210" width="170" height="50" rx="8"/>
+          <text class="b" x="105" y="232" text-anchor="middle">SQS retry poller</text>
+          <text class="ms" x="105" y="249" text-anchor="middle">new, in KafkaModule</text>
+          <rect class="box" x="280" y="20" width="300" height="250" rx="10"/>
+          <text class="m b" x="430" y="44" text-anchor="middle">dispatch()</text>
+          <rect id="s7-r0" class="dim" x="296" y="58" width="268" height="40" rx="6"/>
+          <text x="430" y="83" text-anchor="middle">Parse value, read event type</text>
+          <rect id="s7-r1" class="dim" x="296" y="110" width="268" height="40" rx="6"/>
+          <text x="430" y="135" text-anchor="middle">Find handler: topic + event</text>
+          <rect id="s7-r2" class="dim" x="296" y="162" width="268" height="40" rx="6"/>
+          <text x="430" y="187" text-anchor="middle">Build auth + request context</text>
+          <rect id="s7-r3" class="dim" x="296" y="214" width="268" height="40" rx="6"/>
+          <text x="430" y="239" text-anchor="middle">Call handler, await result</text>
+          <rect id="s7-h" class="box" x="650" y="125" width="230" height="50" rx="8"/>
+          <text class="m b" x="765" y="147" text-anchor="middle">@KafkaMessageHandler</text>
+          <text class="s" x="765" y="164" text-anchor="middle">your method, unchanged</text>
+          <rect id="s7-c" class="box" x="650" y="40" width="230" height="40" rx="8"/>
+          <text x="765" y="65" text-anchor="middle">Commit Kafka offset</text>
+          <rect id="s7-d" class="box" x="650" y="220" width="230" height="40" rx="8"/>
+          <text x="765" y="245" text-anchor="middle">Delete SQS message</text>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">The source differs only at the start (where the message comes from) and the end (how it is acknowledged).</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <!-- ============ MULTI CONSUMER ============ -->
+  <section id="multi">
+    <p class="kicker">Topics with many consumers</p>
+    <h2>Queues belong to a service, not a topic</h2>
+    <p>Every service reads its own copy of a message. A retry must reach only the service that failed.</p>
+
+    <figure class="stage" id="fig-multi" data-mode="per">
+      <div class="stage-top">
+        <span class="lbl">Layout</span>
+        <div class="seg" role="group" aria-label="Queue layout">
+          <button type="button" data-sc="per" aria-pressed="true">Queue per service (proposed)</button>
+          <button type="button" data-sc="shared" aria-pressed="false">One shared queue</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <svg class="dg" viewBox="0 0 900 320" role="img" aria-label="account.events is read by three services. With a queue per service, only billing's failed copy goes to billing's retry queue and back to billing. With one shared queue, other services receive billing's message, put it back, and it is dead-lettered without billing retrying it.">
+          <rect class="box" x="20" y="140" width="150" height="50" rx="8"/>
+          <text class="m b" x="95" y="162" text-anchor="middle">account.events</text>
+          <text class="s" x="95" y="180" text-anchor="middle">offset 42</text>
+          <path class="ln" d="M170 165H230V63H288" marker-end="url(#ah)"/>
+          <path class="ln" d="M230 165H288" marker-end="url(#ah)"/>
+          <path class="ln" d="M230 165V267H288" marker-end="url(#ah)"/>
+          <rect id="s5-a" class="box" x="290" y="40" width="170" height="46" rx="8"/>
+          <text class="b" x="375" y="60" text-anchor="middle">accountservice</text>
+          <text class="s" x="375" y="77" text-anchor="middle">own offset</text>
+          <rect id="s5-b" class="box" x="290" y="142" width="170" height="46" rx="8"/>
+          <text class="b" x="375" y="162" text-anchor="middle">billingservice</text>
+          <text class="s" x="375" y="179" text-anchor="middle">own offset</text>
+          <rect id="s5-n" class="box" x="290" y="244" width="170" height="46" rx="8"/>
+          <text class="b" x="375" y="264" text-anchor="middle">notificationservice</text>
+          <text class="s" x="375" y="281" text-anchor="middle">own offset</text>
+
+          <g class="perq">
+            <path class="ln-faint dash" d="M460 63H560"/>
+            <path class="ln-acc" d="M460 165H558" marker-end="url(#ah-acc)"/>
+            <path class="ln-faint dash" d="M460 267H560"/>
+            <path class="ln-acc dash" d="M655 185V212H375V190" marker-end="url(#ah-acc)"/>
+            <text class="s tacc" x="515" y="228" text-anchor="middle">when due, back to billing only</text>
+            <rect class="dim" x="560" y="45" width="190" height="36" rx="8"/>
+            <text class="ms" x="655" y="67" text-anchor="middle">accounts-kafka-retry</text>
+            <rect id="s5-qb" class="accbox" x="560" y="145" width="190" height="40" rx="8"/>
+            <text class="m b" x="655" y="162" text-anchor="middle">billing-kafka-retry</text>
+            <text class="s" x="655" y="178" text-anchor="middle" id="s5-qbt" data-k>own queue, own DLQ</text>
+            <rect class="dim" x="560" y="249" width="190" height="36" rx="8"/>
+            <text class="ms" x="655" y="271" text-anchor="middle">notifications-kafka-retry</text>
+          </g>
+          <g class="sharedq">
+            <path class="ln-acc" d="M460 165H558" marker-end="url(#ah-acc)"/>
+            <path class="ln-bad dash" d="M655 190V267H462" marker-end="url(#ah-bad)"/>
+            <path class="ln-bad dash" d="M655 140V63H462" marker-end="url(#ah-bad)"/>
+            <text class="s tbad" x="560" y="56" text-anchor="middle">wrong receiver</text>
+            <text class="s tbad" x="560" y="258" text-anchor="middle">wrong receiver</text>
+            <path class="ln-bad" d="M750 165H788" marker-end="url(#ah-bad)"/>
+            <rect id="s5-qs" class="accbox" x="560" y="140" width="190" height="50" rx="8"/>
+            <text class="m b" x="655" y="161" text-anchor="middle">kafka-retry (shared)</text>
+            <text class="s" x="655" y="179" text-anchor="middle" id="s5-rc" data-k>every service polls it</text>
+            <rect id="s5-dlq" class="badbox" x="790" y="140" width="100" height="50" rx="8"/>
+            <text class="b" x="840" y="170" text-anchor="middle">DLQ</text>
+          </g>
+        </svg>
+      </div>
+      <div class="stage-bar">
+        <p class="say">Only billing retries offset 42. The other services never see it again.</p>
+        <div class="ctl">
+          <button type="button" data-act="play" aria-label="Play"><svg class="i-play" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg><svg class="i-pause" viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+          <button type="button" data-act="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 3V0L3.5 4 8 8V5a4 4 0 1 1-4 4H2a6 6 0 1 0 6-6z"/></svg></button>
+        </div>
+      </div>
+    </figure>
+
+    <div class="chips">
+      <div><h4>Rules that follow</h4><ul>
+        <li>Retries and redrives never write back to the Kafka topic</li>
+        <li>Each service's <code>groupId</code> must be unique</li>
+        <li>Count attempts in the message, not with SQS's receive count</li>
+      </ul></div>
+      <div><h4>Also fixed in core</h4><ul>
+        <li>Two handlers for the same topic + event: fail at startup (today the second one silently replaces the first)</li>
+        <li>Shared idempotency store: key includes the consumer group</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ============ MESSAGE ============ -->
+  <section id="message">
+    <p class="kicker">The SQS message</p>
+    <h2>Kafka messages stay as they are</h2>
+    <p>Core wraps the original message in a body only core reads. SQS allows 10 attributes, so everything goes in the body.</p>
+    <div class="anatomy">
+      <div>
+        <h4>Kafka message <em>unchanged</em></h4>
+<pre><span class="k-m">key     </span> acc-91f2
+<span class="k-m">value   </span> {"type":"account.created", …}
+<span class="k-m">headers </span> x-tenant-slug: demo-tenant
+          x-event-type: account.created
+          x-correlation-id: 7c1e…
+          x-user-id: 3f2a…
+          x-api-key: ••••</pre>
+      </div>
+      <div>
+        <h4>SQS retry / DLQ message <em>internal to core, v1</em></h4>
+<pre>{
+  <span class="k-m">"v": 1,</span>
+  <span class="k-o">"original": { "topic": "account.events", "partition": 2,
+                "offset": 42, "key": "acc-91f2", "value": "…",
+                "headers": { … }, "timestamp": 1761552000000 },</span>
+  <span class="k-r">"route":    { "consumerGroup": "billingservice",
+                "eventType": "account.created" },</span>
+  <span class="k-t">"retry":    { "attempt": 4, "firstFailedAt": "…",
+                "nextAttemptAt": "…" },</span>
+  <span class="k-e">"error":    { "class": "QueryFailedError",
+                "message": "connect ECONNREFUSED …" }</span>
+}</pre>
+        <div class="legend">
+          <span><i style="background:var(--fg)"></i>original, replayed as is</span>
+          <span><i style="background:var(--accent)"></i>who retries it</span>
+          <span><i style="background:var(--warn)"></i>retry state</span>
+          <span><i style="background:var(--bad)"></i>last failure</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OPT IN ============ -->
+  <section id="optin">
+    <p class="kicker">Opting in</p>
+    <h2>One service at a time</h2>
+    <ol class="steps">
+      <li><b>Upgrade core</b><span>Minor release. Nothing changes yet.</span></li>
+      <li><b>Create queues</b><span><code>&lt;service&gt;-kafka-retry</code>, <code>-kafka-dlq</code>, IAM</span></li>
+      <li><b>Run the checklist</b><span>Idempotent handlers, no throw-to-skip, strict ordering marked</span></li>
+      <li><b>Turn it on</b><span><code>consumerRetry.enabled</code> from an env var</span></li>
+      <li><b>Startup check</b><span>Core refuses to start if a queue is missing</span></li>
+    </ol>
+    <div class="chips">
+      <div class="plus"><h4>Stays the same</h4><ul>
+        <li>Kafka messages, headers and producers</li>
+        <li>Handler signatures</li>
+        <li>Services that don't opt in</li>
+      </ul></div>
+      <div class="minus"><h4>Changes for opted-in services</h4><ul>
+        <li>Failures retry, then go to the DLQ</li>
+        <li>A message can run more than once</li>
+        <li>Per-key order is lost after inline retries, unless <code>ordering: 'strict'</code></li>
+        <li>Malformed messages go to the DLQ</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ============ ROLLOUT ============ -->
+  <section id="rollout">
+    <p class="kicker">Rollout</p>
+    <h2>Four phases, one behaviour change by default</h2>
+    <div class="phases">
+      <div><p class="n"><span>Phase 0</span><span class="rel">patch</span></p><b>Visibility</b><span>Log the real error, count failures</span><p class="gate">Gate: a week of failure counts</p></div>
+      <div><p class="n"><span>Phase 1</span><span class="rel">minor</span></p><b>Inline retry + DLQ</b><span>Opt-in. Errors reach the consumer; malformed messages go to the DLQ</span><p class="gate">Gate: pilot runs clean in TEST and prod</p></div>
+      <div><p class="n"><span>Phase 2</span><span class="rel">minor</span></p><b>SQS retry + redrive</b><span>Retry queue, poller, backoff, <code>eis kafka dlq</code></span><p class="gate">Gate: pilot redrives a real batch</p></div>
+      <div><p class="n"><span>Phase 3</span><span class="rel">service PRs</span></p><b>Adoption</b><span>Queues in infra, checklist, enable per service</span><p class="gate">Gate: all Kafka consumers enabled</p></div>
+      <div><p class="n"><span>Phase 4</span><span class="rel major">major</span></p><b>Default on</b><span>Enabled by default; SQS tracing fix; remove the skip option</span><p class="gate">Done</p></div>
+    </div>
+  </section>
+
+  <!-- ============ OPEN ============ -->
+  <section id="open">
+    <p class="kicker">Open questions</p>
+    <h2>Still to decide</h2>
+    <ul class="questions">
+      <li>Who creates each service's two queues: a shared Terraform module, or core at startup?</li>
+      <li>Default waits after inline retries: 1 min, 10 min, 1 h, 6 h?</li>
+      <li>Is 14-day DLQ retention enough, or do we archive to S3 before expiry?</li>
+      <li>Should <code>NotFoundException</code> be retryable by default?</li>
+      <li>Who owns DLQ alerts: the service team or platform on-call?</li>
+      <li>Which service pilots Phase 1?</li>
+    </ul>
+  </section>
+
+  <footer>Earlier written proposal (Kafka retry-topic variant): <a href="https://artifacts.tahmid.dev/kafka-retry-design/">Kafka Retry Design</a> · <a href="https://artifacts.tahmid.dev/kafka-retry-diagrams/">Kafka Retry Diagrams</a></footer>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const STOP = Symbol('stop');
+  const RM = matchMedia('(prefers-reduced-motion: reduce)');
+  const ease = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+  const stages = [];
+  let last = performance.now();
+  requestAnimationFrame(function tick(now) {
+    const dt = Math.min(64, now - last); last = now;
+    for (const s of stages) s.step(dt);
+    requestAnimationFrame(tick);
+  });
+
+  class Stage {
+    constructor(fig, script, opt = {}) {
+      Object.assign(this, { fig, script, opt, t: 0, waiters: [], gen: 0, running: false, paused: false, visible: false, held: false, marked: [], sc: 0 });
+      this.svg = fig.querySelector('svg.dg');
+      this.layer = document.createElementNS(NS, 'g');
+      this.svg.appendChild(this.layer);
+      this.texts = new Map();
+      this.svg.querySelectorAll('[data-k]').forEach(e => this.texts.set(e, e.textContent));
+      this.cap = fig.querySelector('.say');
+      this.playBtn = fig.querySelector('[data-act=play]');
+      this.playBtn.addEventListener('click', () => {
+        if (this.running && !this.paused) { this.held = true; this.pause(); } else { this.held = false; this.play(); }
+      });
+      fig.querySelector('[data-act=replay]').addEventListener('click', () => { this.held = false; this.restart(); });
+      this.scs = [...fig.querySelectorAll('[data-sc]')];
+      this.scs.forEach((b, i) => b.addEventListener('click', () => { this.sc = i; this.held = false; this.restart(); }));
+      new IntersectionObserver(es => {
+        for (const e of es) {
+          this.visible = e.isIntersecting;
+          if (this.visible && !this.running && !this.held && !RM.matches) this.play();
+        }
+      }, { threshold: .3 }).observe(fig);
+      stages.push(this);
+      this.sync();
+    }
+    get live() { return this.running && !this.paused && this.visible && !document.hidden; }
+    step(dt) {
+      if (!this.live || !this.waiters.length) return;
+      this.t += dt;
+      for (const w of this.waiters.slice()) {
+        if (w.f) w.f(Math.min(1, (this.t - w.s) / w.d));
+        if (this.t >= w.e) { this.waiters.splice(this.waiters.indexOf(w), 1); w.ok(); }
+      }
+    }
+    wait(ms, f) { return new Promise((ok, no) => this.waiters.push({ s: this.t, e: this.t + ms, d: Math.max(1, ms), f, ok, no })); }
+    tween(ms, f) { if (RM.matches) { f(1); return this.wait(250); } return this.wait(ms, f); }
+    play() { this.paused = false; if (!this.running) { this.running = true; this.loop(); } this.sync(); }
+    pause() { this.paused = true; this.sync(); }
+    restart() { this.kill(); this.running = true; this.paused = false; this.loop(); this.sync(); }
+    kill() { this.gen++; const ws = this.waiters; this.waiters = []; ws.forEach(w => w.no(STOP)); }
+    async loop() {
+      const g = this.gen;
+      try {
+        while (g === this.gen) {
+          this.clear(); this.pick();
+          await this.script(this, this.scs.length ? this.scs[this.sc].dataset.sc : null);
+          await this.wait(2000);
+          if (this.scs.length && this.opt.cycle) this.sc = (this.sc + 1) % this.scs.length;
+        }
+      } catch (e) { if (e !== STOP) console.error(e); }
+    }
+    pick() {
+      this.scs.forEach((b, i) => b.setAttribute('aria-pressed', String(i === this.sc)));
+      this.opt.onPick?.(this, this.scs[this.sc]?.dataset.sc);
+    }
+    sync() {
+      const on = this.running && !this.paused;
+      this.playBtn.classList.toggle('on', on);
+      this.playBtn.setAttribute('aria-label', on ? 'Pause' : 'Play');
+      this.fig.classList.toggle('running', this.running);
+    }
+    clear() {
+      this.layer.replaceChildren();
+      this.marked.forEach(([e, c]) => e.classList.remove(c)); this.marked = [];
+      this.texts.forEach((v, e) => { e.textContent = v; });
+      this.opt.reset?.(this);
+    }
+    $(id) { return typeof id === 'string' ? this.svg.querySelector('#' + id) : id; }
+    mark(id, c) { const e = this.$(id); e.classList.add(c); this.marked.push([e, c]); }
+    unmark(id, c) { this.$(id).classList.remove(c); }
+    set(id, txt) { this.$(id).textContent = txt; }
+    say(txt) { this.cap.textContent = txt; }
+    tok(label = '', cls = '') {
+      const g = document.createElementNS(NS, 'g'); g.setAttribute('class', 'tk ' + cls);
+      const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 10); g.append(c);
+      if (label !== '') { const t = document.createElementNS(NS, 'text'); t.textContent = label; g.append(t); }
+      this.layer.append(g); return g;
+    }
+    card(label, x, y) {
+      const g = document.createElementNS(NS, 'g'); g.setAttribute('class', 'card');
+      g.innerHTML = '<rect x="-40" y="-14" width="80" height="28" rx="6"/><text></text>';
+      g.querySelector('text').textContent = label;
+      this.layer.append(g); return this.at(g, x, y);
+    }
+    ring(x, y) {
+      const g = document.createElementNS(NS, 'g');
+      g.innerHTML = `<circle class="ring-t" cx="${x}" cy="${y}" r="10"/><circle class="ring-p" cx="${x}" cy="${y}" r="10" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" transform="rotate(-90 ${x} ${y})"/>`;
+      this.layer.append(g);
+      const p = g.lastChild;
+      g.set = v => { p.setAttribute('stroke-dashoffset', 100 * (1 - v)); p.classList.toggle('full', v >= 1); };
+      return g;
+    }
+    at(t, x, y) { t._x = x; t._y = y; t.setAttribute('transform', `translate(${x} ${y})`); return t; }
+    tint(t, c) { t.setAttribute('class', 'tk ' + c); }
+    async go(t, pts, ms) {
+      const P = [[t._x, t._y], ...pts], L = [0];
+      for (let i = 1; i < P.length; i++) L.push(L[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+      const tot = L[L.length - 1] || 1, end = P[P.length - 1];
+      if (RM.matches) { await this.wait(250); this.at(t, end[0], end[1]); return; }
+      await this.wait(ms, p => {
+        const d = ease(p) * tot; let i = 1;
+        while (i < L.length - 1 && L[i] < d) i++;
+        const s = (d - L[i - 1]) / ((L[i] - L[i - 1]) || 1);
+        this.at(t, P[i - 1][0] + (P[i][0] - P[i - 1][0]) * s, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * s);
+      });
+      this.at(t, end[0], end[1]);
+    }
+    async fade(t, ms = 400) { await this.tween(ms, p => { t.style.opacity = 1 - p; }); t.remove(); }
+  }
+
+  const fig = id => document.getElementById(id);
+
+  /* 1 · Today: the error disappears */
+  new Stage(fig('fig-today'), async st => {
+    let lost = 0;
+    for (const [o, ok] of [[41, true], [42, false], [43, true]]) {
+      const sx = 30 + (o - 40) * 48 + 20;
+      const t = st.at(st.tok(o), sx, 76);
+      st.say(`The consumer reads offset ${o} and hands it to NestJS`);
+      await st.go(t, [[425, 76]], 650);
+      await st.go(t, [[640, 76]], 500);
+      await st.go(t, [[827, 76]], 450);
+      if (ok) {
+        st.mark('s1-hand', 'st-good'); st.say('The handler succeeds'); st.tint(t, 'good');
+        await st.wait(350); st.unmark('s1-hand', 'st-good');
+        await st.go(t, [[425, 76], [sx, 76]], 1000);
+        st.mark(`s1-o${o}`, 'st-done'); t.remove();
+        continue;
+      }
+      st.mark('s1-hand', 'st-bad'); st.tint(t, 'bad'); st.say('The handler throws QueryFailedError');
+      await st.wait(700);
+      await st.go(t, [[827, 215], [640, 215]], 800);
+      st.mark('s1-void', 'st-bad'); st.set('s1-log', 'logged once: "Internal server error"');
+      st.say('NestJS turns the error into an Observable that nothing subscribes to');
+      await st.fade(t, 900);
+      st.unmark('s1-hand', 'st-bad');
+      const g = st.at(st.tok('✓', 'good'), 640, 76);
+      st.say('eachMessage resolves as if the handler had succeeded');
+      await st.go(g, [[425, 76]], 650);
+      st.mark('s1-cons', 'st-good');
+      await st.go(g, [[sx, 76]], 600); g.remove();
+      st.mark('s1-o42', 'st-lost'); st.set('s1-lost', `lost: ${++lost}`);
+      st.say('Offset 42 is committed. The message is gone.');
+      await st.wait(1800); st.unmark('s1-cons', 'st-good');
+    }
+    st.say('Offset 42 fails in the handler, but the consumer still commits it.');
+  });
+
+  /* 2 · Propagation only: hot loop */
+  new Stage(fig('fig-loop'), async st => {
+    for (let o = 43; o <= 47; o++) st.mark(`s2-o${o}`, 'st-wait');
+    st.mark('s2-o42', 'st-bad');
+    const inc = [1, 1, 1, 2, 4, 9, 22, 60, 180, 520];
+    let att = 0;
+    for (let i = 0; i < inc.length; i++) {
+      const sp = Math.max(.22, 1 - i * .14);
+      st.say(i < 3 ? 'The error now reaches the consumer, which seeks back to 42 and reads it again' : 'No backoff and no limit: 42 loops, and 43 to 47 never get a turn');
+      const t = st.at(st.tok(42), 141, 78);
+      await st.go(t, [[141, 34], [505, 34], [505, 78]], 900 * sp);
+      await st.go(t, [[775, 78]], 450 * sp);
+      st.mark('s2-hand', 'st-bad'); st.tint(t, 'bad');
+      await st.wait(250 * sp);
+      st.unmark('s2-hand', 'st-bad');
+      await st.go(t, [[775, 150], [141, 150], [141, 78]], 1000 * sp);
+      t.remove();
+      att += inc[i];
+      st.set('s2-att', `attempts on 42: ${att}`);
+      st.$('s2-lag').setAttribute('width', Math.min(400, 40 + i * 40));
+      st.set('s2-lagt', `${5 + i * 6} messages`);
+    }
+    st.say('Message 42 is re-read forever, and everything behind it waits.');
+  }, { reset: st => { st.$('s2-lag').setAttribute('width', 40); } });
+
+  /* 3 · Options race */
+  const S3 = {
+    x: ms => ms <= 3000 ? 230 + ms / 3000 * 70 : 300 + (ms - 3000) / (900000 - 3000) * 560,
+    data: {
+      outage: { down: 300000, band: 'downstream down for 5 min', lanes: [
+        { blk: [0, 240000], tries: [0, 200, 800, 2600, 30000, 60000, 120000, 240000], end: 240000, res: 'bad', out: 'DLQ at 4 min, partition blocked' },
+        { wait: [0, 660000], tries: [0, 60000, 660000], end: 660000, res: 'warn', out: 'OK at 11 min' },
+        { wait: [0, 660000], tries: [0, 60000, 660000], end: 660000, res: 'warn', out: 'OK at 11 min, needs DB + scheduler' },
+        { blk: [0, 2600], wait: [2600, 662600], tries: [0, 200, 800, 2600, 62600, 662600], end: 662600, res: 'good', out: 'OK at 11 min, blocked only 2.6 s' }] },
+      blip: { down: 50, band: 'down for 50 ms', lanes: [
+        { blk: [0, 200], tries: [0, 200], end: 200, res: 'good', out: 'OK at 0.2 s' },
+        { wait: [0, 60000], tries: [0, 60000], end: 60000, res: 'warn', out: 'OK at 1 min, left the partition' },
+        { wait: [0, 60000], tries: [0, 60000], end: 60000, res: 'warn', out: 'OK at 1 min' },
+        { blk: [0, 200], tries: [0, 200], end: 200, res: 'good', out: 'OK at 0.2 s, never left' }] }
+    },
+    els: [],
+    grid() {
+      const g = document.getElementById('s3-grid');
+      const ticks = [[0, '0'], [3000, '3 s'], [60000, '1 min'], [300000, '5 min'], [600000, '10 min'], [900000, '15 min']];
+      g.innerHTML = ticks.map(([ms, l]) => { const x = S3.x(ms); return `<line class="rule" x1="${x}" x2="${x}" y1="50" y2="250"/><text class="ms" x="${x}" y="268" text-anchor="middle">${l}</text>`; }).join('')
+        + '<text class="s" x="300" y="284">first 3 s stretched</text>';
+    },
+    build(sc) {
+      const d = S3.data[sc], g = document.getElementById('s3-lanes');
+      const band = document.getElementById('s3-band');
+      band.setAttribute('width', Math.max(4, S3.x(d.down) - 230));
+      document.getElementById('s3-bandt').textContent = d.band;
+      S3.els = []; let h = '';
+      d.lanes.forEach((l, i) => {
+        const y = 78 + i * 50;
+        if (l.blk) h += `<rect class="seg-blk" data-x1="${S3.x(l.blk[0])}" data-x2="${S3.x(l.blk[1])}" x="${S3.x(l.blk[0])}" y="${y - 8}" height="16" width="0"/>`;
+        if (l.wait) h += `<rect class="seg-wait" data-x1="${S3.x(l.wait[0])}" data-x2="${S3.x(l.wait[1])}" x="${S3.x(l.wait[0])}" y="${y - 8}" height="16" width="0"/>`;
+        l.tries.forEach((ms, j) => {
+          const x = S3.x(ms), lastTry = j === l.tries.length - 1;
+          const cls = lastTry ? (l.res === 'bad' ? 'try-dlq' : 'try-ok') : 'try';
+          h += cls === 'try-dlq' ? `<rect class="${cls}" data-x1="${x}" x="${x - 5}" y="${y - 5}" width="10" height="10"/>` : `<circle class="${cls}" data-x1="${x}" cx="${x}" cy="${y}" r="${lastTry ? 5 : 3.5}"/>`;
+        });
+        const o = document.getElementById('s3-o' + i);
+        o.textContent = l.out; o.setAttribute('class', 's t' + l.res); o.dataset.x1 = S3.x(l.end);
+      });
+      g.innerHTML = h;
+      S3.els = [...g.children, ...[0, 1, 2, 3].map(i => document.getElementById('s3-o' + i))];
+    },
+    show(px) {
+      for (const e of S3.els) {
+        const x1 = +e.dataset.x1;
+        if (e.dataset.x2) e.setAttribute('width', Math.max(0, Math.min(+e.dataset.x2, px) - x1));
+        else e.style.opacity = px >= x1 - .5 ? 1 : 0;
+      }
+      document.getElementById('s3-ph').setAttribute('x1', px);
+      document.getElementById('s3-ph').setAttribute('x2', px);
+    }
+  };
+  S3.grid(); S3.build('outage'); S3.show(860);
+  new Stage(fig('fig-options'), async (st, sc) => {
+    S3.build(sc); S3.show(230);
+    st.$('s3-ph').style.opacity = 1;
+    st.say(sc === 'outage' ? 'Downstream is down for 5 minutes. Watch where each approach keeps the failing message.' : 'Downstream hiccups for 50 ms. A retry 200 ms later would succeed.');
+    await st.tween(7000, p => S3.show(230 + 630 * p));
+    st.$('s3-ph').style.opacity = 0;
+    st.say(sc === 'outage' ? 'Blocking retry gives up before the outage ends. The hybrid blocks for 2.6 s, then waits off the partition.' : 'Inline retries fix a blip in place. Topic or database retries make every blip wait a minute.');
+  }, { onPick: (st, sc) => { S3.build(sc); S3.show(230); } });
+
+  /* 4 · Kafka topic vs SQS timers */
+  new Stage(fig('fig-wait'), async st => {
+    const T = 520;
+    const kx = st.card('X · 10:10', 270, 134), ky = st.card('Y · 10:01', 175, 134), kz = st.card('Z · 10:02', 80, 134);
+    const q = [['Y · 10:01', 518, 1], ['Z · 10:02', 613, 2], ['X · 10:10', 710, 10]].map(([l, x, due]) => ({ c: st.card(l, x, 134), r: st.ring(x, 172), due, x }));
+    st.mark('s4-cons', 'st-warn');
+    st.set('s4-ks', 'Head X is not due: the partition pauses until 10:10');
+    st.say('Three failed messages wait: X for 10 minutes, Y and Z for 1 to 2 minutes');
+    for (let m = 1; m <= 11; m++) {
+      await st.tween(T, p => q.forEach(o => { if (o.r.isConnected) o.r.set(Math.min(1, (m - 1 + p) / o.due)); }));
+      st.set('s4-clock', `10:${String(m).padStart(2, '0')}`);
+      for (const o of q.filter(o => o.due === m)) {
+        o.r.remove();
+        st.mark('s4-hand', 'st-good');
+        await st.go(o.c, [[835, 134]], 450);
+        o.c.remove(); st.unmark('s4-hand', 'st-good');
+        st.set('s4-ss', m === 10 ? 'X, Y and Z all ran on time' : `${m === 1 ? 'Y' : 'Y and Z'} ran on time`);
+      }
+      if (m === 10) {
+        st.unmark('s4-cons', 'st-warn'); st.set('s4-ks', 'X is due: the partition resumes');
+        st.say('In the Kafka topic, Y and Z can only leave after X');
+        for (const [c, x] of [[kx, 270], [ky, 175], [kz, 80]]) {
+          await st.go(c, [[387, 134]], 300 + (270 - x) * 2.2);
+          c.remove();
+        }
+        st.set('s4-kl', 'Y ran 9 min late, Z 8 min late');
+      }
+    }
+    st.say('In one Kafka topic, Y and Z leave 8 to 9 minutes late. In SQS every message leaves on time.');
+  });
+
+  /* 6 · Lifecycle */
+  const H = [520, 85];
+  const ARC = [[560, 60], [553, 40], [538, 30], [520, 27], [502, 30], [487, 40], [480, 60], [520, 85]];
+  async function tries(st, t, failN, fast) {
+    for (let k = 1; k <= 3; k++) {
+      st.set('s6-inl', `inline attempt ${k}/3`);
+      if (k > failN) { st.mark('s6-hand', 'st-good'); st.tint(t, 'good'); await st.wait(fast ? 250 : 500); st.unmark('s6-hand', 'st-good'); return true; }
+      st.mark('s6-hand', 'st-bad'); st.tint(t, 'bad');
+      await st.wait(fast ? 120 : 350);
+      st.unmark('s6-hand', 'st-bad');
+      if (k < 3) { st.tint(t, 'warn'); await st.go(t, ARC, fast ? 380 : 750); }
+    }
+    return false;
+  }
+  async function toQueue(st, t, wait, clock) {
+    await st.go(t, [[520, 282]], 600);
+    st.mark('s6-dec', 'st-acc');
+    await st.go(t, [[305, 282]], 500);
+    st.unmark('s6-dec', 'st-acc');
+    st.set('s6-qt', `next try in ${wait}`);
+    await st.tween(1300, p => st.$('s6-qbar').setAttribute('width', 180 * p));
+    st.set('s6-clock', clock);
+    st.tint(t, '');
+    await st.go(t, [[305, 85], H], 900);
+    st.$('s6-qbar').setAttribute('width', 0);
+  }
+  async function ghostCommit(st, from, txt, sub) {
+    const g = st.at(st.tok('✓', 'good'), from[0], from[1]);
+    st.set('s6-ackt', txt); st.set('s6-acks', sub);
+    await st.go(g, [[780, 85]], 450);
+    st.mark('s6-ack', 'st-good'); await st.fade(g, 250);
+  }
+  new Stage(fig('fig-life'), async (st, sc) => {
+    const t = st.at(st.tok(42), 85, 85);
+    st.set('s6-clock', 't = 0 s · from Kafka');
+    if (sc === 'malformed') {
+      st.say('A message arrives that cannot be parsed');
+      await st.go(t, [[295, 85]], 600);
+      st.mark('s6-disp', 'st-bad'); st.tint(t, 'bad');
+      await st.wait(500);
+      st.say('No point retrying: it goes straight to the DLQ instead of being dropped');
+      await st.go(t, [[240, 110], [240, 222], [785, 222], [785, 282]], 1400);
+      st.mark('s6-dlq', 'st-bad'); st.set('s6-dt', 'alert fires');
+      await ghostCommit(st, [295, 85], 'Commit offset', 'after the DLQ write');
+      await st.fade(t, 600);
+      return;
+    }
+    st.say('A message from Kafka goes through dispatch() to the handler');
+    await st.go(t, [[295, 85]], 600);
+    await st.go(t, [H], 500);
+    if (sc === 'blip') {
+      st.say('It fails once. Inline retry runs again 200 ms later, in place.');
+      await tries(st, t, 1, false);
+      st.say('Attempt 2 succeeds. The offset commits; the message never left the partition.');
+      st.set('s6-clock', 't = 0.2 s · from Kafka');
+      st.set('s6-ackt', 'Commit offset'); st.set('s6-acks', 't = 0.2 s');
+      await st.go(t, [[780, 85]], 600); st.mark('s6-ack', 'st-good');
+      await st.fade(t, 500);
+      return;
+    }
+    st.say('Downstream is down: three inline attempts fail within about 2.6 s');
+    await tries(st, t, 3, false);
+    st.set('s6-clock', 't = 2.6 s');
+    st.say('Attempts left: core copies it to billing\'s retry queue, then commits the offset');
+    const ladder = sc === 'outage' ? [['1 min', 't = 1 min · from SQS'], ['10 min', 't = 11 min · from SQS']] : [['1 min', 't = 1 min · from SQS'], ['10 min', 't = 11 min · from SQS'], ['1 h', 't = 1 h 11 min · from SQS'], ['6 h', 't = 7 h 11 min · from SQS']];
+    const commit = ghostCommit(st, H, 'Commit offset', 'after SQS confirms the copy');
+    await toQueue(st, t, ladder[0][0], ladder[0][1]);
+    await commit; st.unmark('s6-ack', 'st-good');
+    for (let i = 1; i < ladder.length; i++) {
+      st.say('SQS hands it back when due: same dispatch(), same handler. Still failing.');
+      await tries(st, t, 3, true);
+      await toQueue(st, t, ladder[i][0], ladder[i][1]);
+    }
+    if (sc === 'outage') {
+      st.say('Downstream is back: the SQS attempt succeeds and the SQS message is deleted');
+      await tries(st, t, 0, false);
+      st.set('s6-ackt', 'Delete SQS message'); st.set('s6-acks', 't = 11 min');
+      await st.go(t, [[780, 85]], 600); st.mark('s6-ack', 'st-good');
+      await st.fade(t, 500);
+      return;
+    }
+    st.say('After the last wait it still fails');
+    await tries(st, t, 3, true);
+    await st.go(t, [[520, 282]], 600);
+    st.mark('s6-dec', 'st-bad');
+    await st.go(t, [[785, 282]], 600);
+    st.mark('s6-dlq', 'st-bad'); st.set('s6-dt', 'alert fires');
+    st.say('No attempts left: it lands in billing\'s DLQ and the team is alerted');
+    await st.wait(1800);
+    st.say('Someone fixes the cause and redrives from the CLI');
+    st.tint(t, '');
+    await st.go(t, [[785, 366], [305, 366], [305, 282]], 1500);
+    st.set('s6-qt', 'redriven, attempts reset');
+    await st.wait(600);
+    await st.go(t, [[305, 85], H], 900);
+    await tries(st, t, 0, false);
+    st.say('The redriven message succeeds and is deleted');
+    st.set('s6-ackt', 'Delete SQS message'); st.set('s6-acks', 'after redrive');
+    await st.go(t, [[780, 85]], 600); st.mark('s6-ack', 'st-good');
+    await st.fade(t, 500);
+  }, { cycle: true, reset: st => st.$('s6-qbar').setAttribute('width', 0) });
+
+  /* 7 · Two pollers */
+  new Stage(fig('fig-pollers'), async st => {
+    for (const [from, y, ack, label, cls, msg, done] of [
+      ['s7-kc', 65, 's7-c', 'K', '', 'A Kafka delivery goes through dispatch()', 'then the Kafka offset is committed'],
+      ['s7-sp', 235, 's7-d', 'R', 'warn', 'An SQS retry: core unpacks the original Kafka message, then the same dispatch()', 'then the SQS message is deleted']]) {
+      st.say(msg);
+      st.mark(from, 'st-acc');
+      const t = st.at(st.tok(label, cls), 105, y);
+      await st.go(t, [[280, y]], 700);
+      st.unmark(from, 'st-acc');
+      for (let i = 0; i < 4; i++) {
+        await st.go(t, [[310, 78 + i * 52]], 420);
+        st.mark(`s7-r${i}`, 'st-acc');
+        await st.wait(250);
+      }
+      await st.go(t, [[580, 150], [765, 150]], 700);
+      st.mark('s7-h', 'st-good');
+      await st.wait(400);
+      st.say(`The same handler runs, ${done}`);
+      await st.go(t, [[765, ack === 's7-c' ? 60 : 240]], 500);
+      st.mark(ack, 'st-good');
+      await st.fade(t, 500);
+      await st.wait(900);
+      for (let i = 0; i < 4; i++) st.unmark(`s7-r${i}`, 'st-acc');
+      st.unmark('s7-h', 'st-good'); st.unmark(ack, 'st-good');
+    }
+    st.say('The source differs only at the start (where the message comes from) and the end (how it is acknowledged).');
+  });
+
+  /* 5 · Many consumers */
+  new Stage(fig('fig-multi'), async (st, sc) => {
+    st.say('Each service reads its own copy of offset 42, with its own offset');
+    const a = st.at(st.tok(42), 170, 165), b = st.at(st.tok(42), 170, 165), n = st.at(st.tok(42), 170, 165);
+    await Promise.all([
+      st.go(a, [[230, 165], [230, 63], [375, 63]], 1000),
+      st.go(b, [[375, 165]], 1000),
+      st.go(n, [[230, 165], [230, 267], [375, 267]], 1000)]);
+    st.mark('s5-a', 'st-good'); st.mark('s5-n', 'st-good'); st.mark('s5-b', 'st-bad');
+    st.tint(a, 'good'); st.tint(n, 'good'); st.tint(b, 'bad');
+    st.say('Billing fails after its inline retries. The other two succeed and move on.');
+    await Promise.all([st.fade(a, 700), st.fade(n, 700)]);
+    if (sc === 'per') {
+      await st.go(b, [[655, 165]], 800);
+      st.set('s5-qbt', 'next try in 1 min');
+      st.say('Only billing\'s copy goes to billing\'s own retry queue');
+      await st.wait(1400);
+      st.tint(b, '');
+      await st.go(b, [[655, 212], [375, 212], [375, 165]], 1100);
+      st.unmark('s5-b', 'st-bad'); st.mark('s5-b', 'st-good'); st.tint(b, 'good');
+      st.say('Billing retries alone. Accounts and notifications never see 42 again.');
+      await st.fade(b, 800);
+      return;
+    }
+    await st.go(b, [[655, 165]], 800);
+    st.say('All three services poll the same shared retry queue');
+    await st.wait(700);
+    let rc = 0;
+    for (const [svc, id, y] of [['notificationservice', 's5-n', 267], ['accountservice', 's5-a', 63], ['notificationservice', 's5-n', 267], ['accountservice', 's5-a', 63]]) {
+      st.tint(b, 'warn');
+      const edge = y > 165 ? 190 : 140;
+      await st.go(b, [[655, edge], [655, y], [462, y]], 800);
+      st.unmark(id, 'st-good'); st.mark(id, 'st-warn');
+      st.set('s5-rc', `receive count: ${++rc}`);
+      st.say(`${svc} receives billing's message, has no handler for it and puts it back`);
+      await st.wait(500);
+      await st.go(b, [[655, y], [655, edge], [655, 165]], 700);
+      st.unmark(id, 'st-warn');
+    }
+    st.set('s5-rc', 'receive limit reached');
+    st.tint(b, 'bad');
+    await st.go(b, [[840, 165]], 600);
+    st.mark('s5-dlq', 'st-bad');
+    st.say('Billing\'s retry is dead-lettered without billing ever running it again');
+    await st.wait(1200);
+    await st.fade(b, 600);
+  }, { onPick: (st, sc) => { st.fig.dataset.mode = sc; } });
+})();
+</script>
