@@ -722,7 +722,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--panel
     <h2>Researched since the first draft</h2>
     <ul class="done-list">
       <li><b>Queues</b><span>Created in Terraform, in terraform-live. Core only looks them up.</span></li>
-      <li><b>Wait</b><span>30 minutes between SQS attempts.</span></li>
+      <li><b>Attempts</b><span>4 SQS attempts, 30 minutes apart. After 2 hours the item goes to the red chest (DLQ).</span></li>
       <li><b>Retention</b><span>14 days in the DLQ is enough. No S3 archive.</span></li>
       <li><b>Not retryable</b><span><code>NotFoundException</code> is not retried. Core asks a retry predicate (working name <code>isRetryableException</code>) before every retry.</span></li>
       <li><b>Alerts</b><span>Each service owns its DLQ and the alerts on it.</span></li>
@@ -730,7 +730,6 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--panel
     </ul>
     <h2>Still to decide</h2>
     <ul class="alerts">
-      <li>How many 30-minute SQS attempts before the DLQ? The animation assumes 4, so 2 hours.</li>
       <li>Where a non-retryable error goes: straight to the DLQ (like a malformed item), or logged and committed?</li>
       <li>Retry predicate shape: a core default list plus a per-handler <code>shouldRetry(error)</code> override, or exception classes marked retryable?</li>
     </ul>
