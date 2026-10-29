@@ -4,7 +4,7 @@
     "title": "Kafka Consumer Retries",
     "summary": "Animated draft design: inline retries, then per-service SQS retry queue and DLQ for Kafka consumers in @emilgroup/core.",
     "date": "2026-10-28",
-    "updated": "2026-10-28"
+    "updated": "2026-10-29"
   },
   {
     "slug": "retry-factory",
