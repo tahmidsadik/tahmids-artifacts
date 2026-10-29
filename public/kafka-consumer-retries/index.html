@@ -713,13 +713,12 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule)
       <div><b>Queues</b><span>Created in Terraform, in terraform-live. Core only looks them up.</span></div>
       <div><b>Attempts</b><span>4 SQS attempts, 30 minutes apart. After 2 hours the message goes to the DLQ.</span></div>
       <div><b>Retention</b><span>14 days in the DLQ is enough. No S3 archive.</span></div>
-      <div><b>Not retryable</b><span><code>NotFoundException</code> is not retried. Core asks a retry predicate (working name <code>isRetryableException</code>) before every retry.</span></div>
+      <div><b>Not retryable</b><span><code>NotFoundException</code> is not retried. Core asks a retry predicate (working name <code>isRetryableException</code>) before every retry. A non-retryable error sends the message straight to the DLQ, like a malformed message, with no further tries.</span></div>
       <div><b>Alerts</b><span>Each service owns its DLQ and the alerts on it.</span></div>
       <div><b>Pilots</b><span>billing, changelog and commission services.</span></div>
     </div>
     <h2>Still to decide</h2>
     <ul class="questions">
-      <li>Where a non-retryable error goes: straight to the DLQ (like a malformed message), or logged and committed?</li>
       <li>Retry predicate shape: a core default list plus a per-handler <code>shouldRetry(error)</code> override, or exception classes marked retryable?</li>
     </ul>
   </section>
