@@ -1,12 +1,5 @@
 [
   {
-    "slug": "orion-doxis-briefing",
-    "title": "Orion Doxis Briefing",
-    "summary": "Orion's current Alabus, IIL and Doxis document architecture, what EIS must take over, and the questions for the Doxis dev call.",
-    "date": "2026-11-05",
-    "updated": "2026-11-05"
-  },
-  {
     "slug": "retry-factory",
     "title": "The Retry Factory",
     "summary": "Kafka consumer retries as a Factorio-style production line: belts, inserters, robots and retry chests.",
